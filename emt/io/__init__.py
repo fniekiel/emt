@@ -5,4 +5,4 @@ These are converted to the EMD file format for processing and interchangeability
 The different readers are organized into submodules.
 '''
 
-import ser
+#import ser
