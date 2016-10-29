@@ -3,7 +3,7 @@ Tests for the io module
 '''
 
 import unittest
-import emt.io
+import emt.io.ser
 
 class test(unittest.TestCase):
 
