@@ -16,8 +16,14 @@ class fileSER:
     def __init__(self, filename, verbose=False):
         '''Init opening the file and reading in the header.
         '''
-        # try opening the file
+        # necessary declarations, if something fails
         self.file_hdl = None
+
+        # check for string
+        if not isinstance(filename, str):
+            raise TypeError('filename is supposed to be a string')
+
+        # try opening the file
         try:
             self.file_hdl = open(filename, 'rb')
         except IOError:
@@ -45,8 +51,13 @@ class fileSER:
         - head		the header of the SER file
         '''
         
+        # prepare empty dict to be populated while reading
         head = {}
 
+        # go back to beginning of file
+        self.file_hdl.seek(0,0)
+
+        # read 3 int16
         data = np.fromfile(self.file_hdl, dtype='<i2', count=3)
 
         # ByteOrder (only little Endian expected)
@@ -67,12 +78,62 @@ class fileSER:
         # SeriesVersion
         dictSeriesVersion = {0x0210 : '< TIA 4.7.3', 0x0220 : '>= TIA 4.7.3'}
         if not data[2] in dictSeriesVersion:
-            raise RuntimeError('Unknown TIA version: "{}"'.format(hex(data[2])))
+            raise RuntimeError('Unknown TIA version: "{:#06x}"'.format(data[2]))
         head['SeriesVersion'] = data[2]
         if verbose:
             print('SeriesVersion:\t"{:#06x}",\t{}'.format(data[2], dictSeriesVersion[data[2]]))
 
+        # read 4 int32
+        data = np.fromfile(self.file_hdl, dtype='<i4', count=4)
 
+        # DataTypeID
+        dictDataTypeID = {0x4120:'1D spectra', 0x4122:'2D images'}
+        if not data[0] == 0x4122:
+            raise RuntimeError('Only 2D images implemented so far')
+        head['DataTypeID'] = data[0]
+        if verbose:
+            print('DataTypeID:\t"{:#06x}",\t{}'.format(data[0], dictDataTypeID[data[0]]))
+
+        # TagTypeID
+        dictTagTypeID = {0x4152:'time only',0x4142:'time and 2D position'}
+        if not data[1] in dictTagTypeID:
+            raise RuntimeError('Unknown TagTypeID: "{:#06x}"'.format(data[1]))
+        head['TagTypeID'] = data[1]
+        if verbose:
+            print('TagTypeID:\t"{:#06x}",\t{}'.format(data[1], dictTagTypeID[data[1]]))
+
+        # TotalNumberElements
+        if not data[2] >= 0:
+            raise RuntimeError('Negative total number of elements: {}'.format(data[2]))
+        head['TotalNumberElements'] = data[2]
+        if verbose:
+            print('TotalNumberElements:\t{}'.format(data[2]))
+
+        # ValidNumberElements
+        if not data[3] >= 0:
+            raise RuntimeError('Negative valid number of elements: {}'.format(data[3]))
+        head['ValidNumberElements'] = data[3]
+        if verbose:
+            print('ValidNumberElements:\t{}'.format(data[3]))
+        
+        # OffsetArrayOffset, sensitive to SeriesVersion
+        if head['SeriesVersion']==0x0210:
+            data = np.fromfile(self.file_hdl, dtype='<i4', count=1)
+        elif head['SeriesVersion']==0x220:
+            data = np.fromfile(self.file_hdl, dtype='<i8', count=1)
+        else:
+            raise RuntimeError('TIA version not implemented for OffsetArrayOffset')
+        head['OffsetArrayOffset'] = data[0]
+        if verbose:
+            print('OffsetArrayOffset:\t{}'.format(data[0]))
+
+        # NumberDimensions
+        data = np.fromfile(self.file_hdl, dtype='<i4', count=1)
+        if not data[0] >= 0:
+            raise RuntimeError('Negative number of dimensions')
+        head['NumberDimensions']=data[0]
+        if verbose:
+            print('NumberDimensions:\t{}'.format(data[0]))
 
 
         return head
