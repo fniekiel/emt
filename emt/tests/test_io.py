@@ -17,7 +17,9 @@ class test(unittest.TestCase):
             fser = emt.io.ser.fileSER('')
 
         # existing file
-        fser = emt.io.ser.fileSER('resources/Pt_SAED_D910mm_single/im01_1.ser')
+        fser = emt.io.ser.fileSER('resources/Pt_SAED_D910mm_single/im01_1.ser', verbose=True)
+
+        #fser.getImage(0)
 
 
 # to test with unittest runner
