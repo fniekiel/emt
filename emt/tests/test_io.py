@@ -38,9 +38,12 @@ class test(unittest.TestCase):
         dataset, meta = fser.getDataset(0, verbose=True)
         tag = fser.getTag(0, verbose=True)
         
+        fser.writeEMD('resources/output/Pt_SAED_D910mm_single.emd')
+        
         # try series file
         fser = emt.io.ser.fileSER('resources/Au_SAED_D910mm_100x_at_RT/step_off_1.ser', verbose=True)
 
+        fser.writeEMD('resources/output/Au_SAED_D910mm_100x_at_RT.emd')
 
 # to test with unittest runner
 if __name__ == '__main__':

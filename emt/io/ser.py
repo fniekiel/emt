@@ -4,6 +4,9 @@ This module provides an interface to the SER file format written by TIA.
 Following the information provided by Dr Chris Boothroyd (http://www.er-c.org/cbb/info/TIAformat/) and the implementation by Peter Ercius.
 '''
 import numpy as np
+import h5py
+import os
+
 
 class NotSERError(Exception):
     '''Exception if a file is not in SER file format'''
@@ -394,7 +397,41 @@ class fileSER:
                 print('PositionY:\t{}'.format(data[1]))   
      
         return tag
-            
-            
-            
+        
+        
+    def writeEMD(self, filename):
+        '''
+        Write SER data to an EMD file.
+        
+        input:
+        - filename (string)             name of the EMD file
+        '''
+        
+        # create the EMD file and set version attributes
+        f = h5py.File(filename, 'w')
+        f.attrs['version_major'] = 0
+        f.attrs['version_minor'] = 2
+        
+        # create a subgroup to not save data in root
+        from_SER = f.create_group('from_SER')
+        
+        # subgroup for the file
+        grp = from_SER.create_group(os.path.basename(self.file_hdl.name))
+        
+        # mark as EMD group
+        grp.attrs['emd_group_type'] = 1
+        
+        # use first dataset to layout memory
+        data, first_meta = self.getDataset(0)
+        
+        if self.head['DataTypeID'] == 0x4122:
+            dset = grp.create_dataset('data', (first_meta['ArraySizeX'], first_meta['ArraySizeY'], self.head['ValidNumberElements']), dtype=self.dictDataType[first_meta['DataType']])
+        
+        for i in range(self.head['ValidNumberElements']):
+            #data, meta = self.getDataset(i)
+            data = np.zeros((2048,2048))
+            dset[:,:,i] = data
+            f.flush()
+        
+        f.close()
             
