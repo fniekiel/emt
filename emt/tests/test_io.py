@@ -1,5 +1,5 @@
 '''
-Tests for the io module
+Tests for the io module.
 '''
 
 import unittest
@@ -11,8 +11,13 @@ class test(unittest.TestCase):
         '''
         test the SER module
         '''
-        emt.io.ser.test_ser()
-        self.assertTrue(False)
+
+        # non existing file
+        with self.assertRaises(IOError):
+            fser = emt.io.ser.fileSER('')
+
+        # existing file
+        fser = emt.io.ser.fileSER('resources/Pt_SAED_D910mm_single/im01_1.ser')
 
 
 # to test with unittest runner
