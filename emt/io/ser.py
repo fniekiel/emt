@@ -6,6 +6,7 @@ Following the information provided by Dr Chris Boothroyd (http://www.er-c.org/cb
 import numpy as np
 
 class NotSERError(Exception):
+    '''Exception if a file is not in SER file format'''
     pass
 
 class fileSER:
