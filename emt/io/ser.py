@@ -325,19 +325,25 @@ class fileSER:
         
         data = np.fromfile(self.file_hdl, dtype='<i4', count=2)
         
-        # ArraySizeX
-        meta['ArraySizeX'] = data[0]
+        # ArrayShape
+        data = data.tolist()
+        meta['ArrayShape'] = data
         if verbose:
-            print('ArraySizeX:\t{}'.format(data[0]))
+            print('ArrayShape:\t{}'.format(data))
         
-        # ArraySizeY
-        meta['ArraySizeY'] = data[1]
-        if verbose:
-            print('ArraySizeY:\t{}'.format(data[1]))
+        ## ArraySizeX
+        #meta['ArraySizeX'] = data[0]
+        #if verbose:
+        #    print('ArraySizeX:\t{}'.format(data[0]))
+        
+        ## ArraySizeY
+        #meta['ArraySizeY'] = data[1]
+        #if verbose:
+        #    print('ArraySizeY:\t{}'.format(data[1]))
             
         # dataset
-        dataset = np.fromfile(self.file_hdl, dtype=self.dictDataType[meta['DataType']], count=meta['ArraySizeX']*meta['ArraySizeY'])
-        dataset = dataset.reshape((meta['ArraySizeY'], meta['ArraySizeX']))
+        dataset = np.fromfile(self.file_hdl, dtype=self.dictDataType[meta['DataType']], count=meta['ArrayShape'][0]*meta['ArrayShape'][1])
+        dataset = dataset.reshape(meta['ArrayShape'])
         
         if self.head['DataTypeID'] == 0x4122:
             dataset = np.flipud(dataset)
@@ -399,6 +405,30 @@ class fileSER:
      
         return tag
         
+    
+    def createDim(self, size, offset, delta, element):
+        '''Create dimension labels from SER information
+        
+        input:
+        - size          number of elements
+        - offset        value at indicated element
+        - delta         difference between elements
+        - element       indicates the element of value offset
+        
+        return:
+        - dim           dimension labels as np.array
+        
+        '''
+        
+        #dim = np.zeros(size)
+        #dim[:] = np.nan
+        
+        dim = np.array(range(size)).astype('f8')
+        dim = dim*delta
+        dim += (offset - dim[element])
+        
+        return dim
+        
         
     def writeEMD(self, filename):
         '''
@@ -426,7 +456,7 @@ class fileSER:
         data, first_meta = self.getDataset(0)
         
         if self.head['DataTypeID'] == 0x4122:
-            dset = grp.create_dataset('data', (first_meta['ArraySizeX'], first_meta['ArraySizeY'], self.head['ValidNumberElements']), dtype=self.dictDataType[first_meta['DataType']])
+            dset = grp.create_dataset('data', (first_meta['ArrayShape'][0], first_meta['ArrayShape'][1], self.head['ValidNumberElements']), dtype=self.dictDataType[first_meta['DataType']])
         else:
             raise RuntimeError('Only 2D datasets implemented yet!')
         
@@ -448,15 +478,23 @@ class fileSER:
         f.flush()
         del dset_buf
         
-        # number of dimensions
-        n = self.head['NumberDimensions']
-        if self.head['DataTypeID'] == 0x4122:
-            n += 2
-        else:
-            raise RuntimeError('Only 2D datasets implemented yet!')
+        ## number of dimensions
+        #n = self.head['NumberDimensions']
+        #if self.head['DataTypeID'] == 0x4122:
+        #    n += 2
+        #else:
+        #    raise RuntimeError('Only 2D datasets implemented yet!')
+        
+        n = 0
+        for i in range(len(first_meta['ArrayShape'])):
+            dim = self.createDim(first_meta['ArrayShape'][i], first_meta['Calibration'][i]['CalibrationOffset'], first_meta['Calibration'][i]['CalibrationDelta'], first_meta['Calibration'][i]['CalibrationElement'])
+            grp.create_dataset('dim{:d}'.format(n), data=dim)
+            n +=1
             
-        
-        
+        for i in range(self.head['NumberDimensions']):
+            dim = self.createDim(self.head['Dimensions'][i]['DimensionSize'], self.head['Dimensions'][i]['CalibrationOffset'], self.head['Dimensions'][i]['CalibrationDelta'], self.head['Dimensions'][i]['CalibrationElement'])
+            grp.create_dataset('dim{:d}'.format(n), data=dim)
+            n +=1
         
         f.close()
             
