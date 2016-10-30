@@ -135,6 +135,65 @@ class fileSER:
         if verbose:
             print('NumberDimensions:\t{}'.format(data[0]))
 
+        # Dimension array
+        dimensions = []
+        for i in range(head['NumberDimensions']):
+            if verbose:
+                print('reading Dimension {}'.format(i))
+            this_dim = {}
+        
+            # DimensionSize
+            data = np.fromfile(self.file_hdl, dtype='<i4', count=1)
+            this_dim['DimensionSize'] = data[0]
+            if verbose:
+                print('DimensionSize:\t{}'.format(data[0]))
+            
+            data = np.fromfile(self.file_hdl, dtype='<f8', count=2)
+            
+            # CalibrationOffset
+            this_dim['CalibrationOffset'] = data[0]
+            if verbose:
+                print('CalibrationOffset:\t{}'.format(data[0]))
+            
+            # CalibrationDelta
+            this_dim['CalibrationDelta'] = data[1]
+            if verbose:
+                print('CalibrationDelta:\t{}'.format(data[1]))
+            
+            data = np.fromfile(self.file_hdl, dtype='<i4', count=2)
+            
+            # CalibrationElement
+            this_dim['CalibrationElement'] = data[0]
+            if verbose:
+                print('CalibrationElement:\t{}'.format(data[0]))
+            
+            # DescriptionLength
+            n = data[1]
+            
+            # Description
+            data = np.fromfile(self.file_hdl, dtype='<i1', count=n)
+            data = ''.join(map(chr, data))
+            this_dim['Description'] = data
+            if verbose:
+                print('Description:\t{}'.format(data))
+            
+            # UnitsLength
+            data = np.fromfile(self.file_hdl, dtype='<i4', count=1)
+            n = data[0]
+            
+            # Units
+            data = np.fromfile(self.file_hdl, dtype='<i1', count=n)
+            data = ''.join(map(chr, data))
+            this_dim['Units'] = data
+            if verbose:
+                print('Units:\t{}'.format(data))
+
+
+            dimensions.append(this_dim)
+            
+        head['Dimensions'] = tuple(dimensions)
+        
+        #import pdb;pdb.set_trace()
 
         return head
 
