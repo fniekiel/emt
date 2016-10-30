@@ -48,7 +48,7 @@ class fileSER:
         Read and return the SER files header.
 
         returns:
-        - head		the header of the SER file
+        - head		the header of the SER file as dict
         '''
         
         # prepare empty dict to be populated while reading
@@ -82,7 +82,12 @@ class fileSER:
         head['SeriesVersion'] = data[2]
         if verbose:
             print('SeriesVersion:\t"{:#06x}",\t{}'.format(data[2], dictSeriesVersion[data[2]]))
-
+        # version dependend fileformat for below
+        if head['SeriesVersion']==0x0210:
+            offset_dtype = '<i4'
+        else: #head['SeriesVersion']==0x220:
+            offset_dtype = '<i8'
+        
         # read 4 int32
         data = np.fromfile(self.file_hdl, dtype='<i4', count=4)
 
@@ -117,12 +122,7 @@ class fileSER:
             print('ValidNumberElements:\t{}'.format(data[3]))
         
         # OffsetArrayOffset, sensitive to SeriesVersion
-        if head['SeriesVersion']==0x0210:
-            data = np.fromfile(self.file_hdl, dtype='<i4', count=1)
-        elif head['SeriesVersion']==0x220:
-            data = np.fromfile(self.file_hdl, dtype='<i8', count=1)
-        else:
-            raise RuntimeError('TIA version not implemented for OffsetArrayOffset')
+        data = np.fromfile(self.file_hdl, dtype=offset_dtype, count=1)
         head['OffsetArrayOffset'] = data[0]
         if verbose:
             print('OffsetArrayOffset:\t{}'.format(data[0]))
@@ -135,7 +135,8 @@ class fileSER:
         if verbose:
             print('NumberDimensions:\t{}'.format(data[0]))
 
-        # Dimension array
+
+        # Dimensions array
         dimensions = []
         for i in range(head['NumberDimensions']):
             if verbose:
@@ -190,10 +191,26 @@ class fileSER:
 
 
             dimensions.append(this_dim)
-            
+        
+        # save dimensions array as tuple of dicts in head dict
         head['Dimensions'] = tuple(dimensions)
         
-        #import pdb;pdb.set_trace()
+        
+        # Offset array
+        self.file_hdl.seek(head['OffsetArrayOffset'],0)
+        
+        # DataOffsetArray
+        data = np.fromfile(self.file_hdl, dtype=offset_dtype, count=head['ValidNumberElements'])
+        head['DataOffsetArray'] = data.tolist()
+        if verbose:
+            print('reading in DataOffsetArray')
+        
+        # TagOffsetArray
+        data = np.fromfile(self.file_hdl, dtype=offset_dtype, count=head['ValidNumberElements'])
+        head['TagOffsetArray'] = data.tolist()
+        if verbose:
+            print('reading in TagOffsetArray')
+     
 
         return head
 
