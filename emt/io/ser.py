@@ -12,6 +12,7 @@ class NotSERError(Exception):
     '''Exception if a file is not in SER file format'''
     pass
 
+
 class fileSER:
     '''
     Class to represent SER files (read only).
@@ -426,14 +427,36 @@ class fileSER:
         
         if self.head['DataTypeID'] == 0x4122:
             dset = grp.create_dataset('data', (first_meta['ArraySizeX'], first_meta['ArraySizeY'], self.head['ValidNumberElements']), dtype=self.dictDataType[first_meta['DataType']])
+        else:
+            raise RuntimeError('Only 2D datasets implemented yet!')
         
+        ### h5py performance issues, switching to a memory based approach
+        #for i in range(self.head['ValidNumberElements']):
+        #    print('converting dataset {} of {}'.format(i+1, self.head['ValidNumberElements']))
+        #    data, meta = self.getDataset(i)
+        #    dset[:,:,i] = data[:,:]
+        #    f.flush()
+        
+        ### if series size is to large, this will lead to heavy swapping   
+        dset_buf = np.zeros( dset.shape, dtype=dset.dtype )
         for i in range(self.head['ValidNumberElements']):
             print('converting dataset {} of {}'.format(i+1, self.head['ValidNumberElements']))
             data, meta = self.getDataset(i)
-            dset[:,:,i] = data[:,:]
-            f.flush()
+            dset_buf[:,:,i] = data[:,:]
             
-        # add dimensions
+        dset[:,:,:] = dset_buf[:,:,:]
+        f.flush()
+        del dset_buf
+        
+        # number of dimensions
+        n = self.head['NumberDimensions']
+        if self.head['DataTypeID'] == 0x4122:
+            n += 2
+        else:
+            raise RuntimeError('Only 2D datasets implemented yet!')
+            
+        
+        
         
         f.close()
             
