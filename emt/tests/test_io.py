@@ -19,13 +19,26 @@ class test(unittest.TestCase):
         # non existing file
         with self.assertRaises(IOError):
             fser = emt.io.ser.fileSER('')
+            
+        # wrong file
+        with self.assertRaises(Exception):
+            fser = emt.io.ser.fileSER('resources/Pt_SAED_D910mm_single/im01.emi', verbose=True)
 
         # try single image file
         fser = emt.io.ser.fileSER('resources/Pt_SAED_D910mm_single/im01_1.ser', verbose=True)
+        
+        # wrong index
+        with self.assertRaises(IndexError):
+            fser.getDataset(-1)
+            
+        # wrong index type
+        with self.assertRaises(TypeError):
+            fser.getDataset('foo')
+        
+        dataset, meta = fser.getDataset(0, verbose=True)
+        
         # try series file
         fser = emt.io.ser.fileSER('resources/Au_SAED_D910mm_100x_at_RT/step_off_1.ser', verbose=True)
-
-        #fser.getImage(0)
 
 
 # to test with unittest runner

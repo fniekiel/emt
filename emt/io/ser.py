@@ -16,13 +16,17 @@ class fileSER:
 
     def __init__(self, filename, verbose=False):
         '''Init opening the file and reading in the header.
+        
+        input:
+        - filename (string)     name of the SER file
+        - verbose (bool)        True to get extensive output while reading the file
         '''
         # necessary declarations, if something fails
         self.file_hdl = None
 
         # check for string
         if not isinstance(filename, str):
-            raise TypeError('filename is supposed to be a string')
+            raise TypeError('Filename is supposed to be a string')
 
         # try opening the file
         try:
@@ -47,6 +51,9 @@ class fileSER:
     def readHeader(self, verbose=False):
         '''
         Read and return the SER files header.
+        
+        input:
+        - verbose (bool)        True to get extensive output while reading the file
 
         returns:
         - head		the header of the SER file as dict
@@ -210,19 +217,137 @@ class fileSER:
         data = np.fromfile(self.file_hdl, dtype=offset_dtype, count=head['ValidNumberElements'])
         head['TagOffsetArray'] = data.tolist()
         if verbose:
-            print('reading in TagOffsetArray')
-     
+            print('reading in TagOffsetArray')     
 
         return head
 
 
-    def getImage(self, i):
-        '''Retrieve image i from data file.
+    def checkIndex(self, i):
+        '''
+        Check index i for sanity, otherwise raise Exception.
+        
+        input:
+        - i(int)        index
+        '''
+        
+        # check type
+        if not isinstance(i, int):
+            raise TypeError('index supposed to be integer')
+
+        # check whether in range
+        if i < 0 or i>= self.head['ValidNumberElements']:
+            raise IndexError('Index out of range, trying to access element {} of {} valid elements'.format(i+1, self.head['ValidNumberElements']))
+            
+        return
+        
+
+    def getDataset(self, index, verbose=False):
+        '''Retrieve dataset from data file.
+
+        input:
+        - index (int)   index of dataset
+        - verbose (bool)        True to get extensive output while reading the file
+        
+        returns:
+        - dataset	dataset as array
+        - meta          metadata as dict
+        '''
+
+        # check index, will raise Exceptions if not
+        try:
+            self.checkIndex(index)
+        except:
+            raise
+
+        if verbose:
+            print('Getting dataset {} of {}.'.format(index, self.head['ValidNumberElements']))
+            
+        # go to dataset in file
+        self.file_hdl.seek(self.head['DataOffsetArray'][index],0)
+        
+        # read meta
+        meta = {}
+        
+        # number of calibrations depends on DataTypeID
+        if self.head['DataTypeID'] == 0x4120:
+            n = 1
+        elif self.head['DataTypeID'] == 0x4122:
+            n = 2
+        else:
+            raise RuntimeError('Unknown DataTypeID')
+       
+        # read in the calibrations    
+        cals = []
+        for i in range(n):
+            if verbose:
+                print('Reading calibration {}'.format(i))
+                
+            this_cal = {}
+        
+            data = np.fromfile(self.file_hdl, dtype='<f8', count=2)
+            
+            # CalibrationOffset
+            this_cal['CalibrationOffset'] = data[0]
+            if verbose:
+                print('CalibrationOffset:\t{}'.format(data[0]))
+            
+            # CalibrationDelta
+            this_cal['CalibrationDelta'] = data[1]
+            if verbose:
+                print('CalibrationDelta:\t{}'.format(data[1]))
+            
+            data = np.fromfile(self.file_hdl, dtype='<i4', count=1)
+            
+            # CalibrationElement
+            this_cal['CalibrationElement'] = data[0]
+            if verbose:
+                print('CalibrationElement:\t{}'.format(data[0]))
+            
+            cals.append(this_cal)
+            
+        meta['Calibration'] = tuple(cals)
+        
+        data = np.fromfile(self.file_hdl, dtype='<i2', count=1)
+        
+        # DataType
+        meta['DataType'] = data[0]
+        dictDataType = {1:'<u1', 2:'<u2', 3:'<u4', 4:'<i1', 5:'<i2', 6:'<i4', 7:'<f4', 8:'<f8', 9:'<c8', 10:'<c16'}
+        if not data[0] in dictDataType:
+            raise RuntimeError('Unknown DataType: "{}"'.format(data[0]))
+        if verbose:
+            print('DataType:\t{},\t{}'.format(data[0],dictDataType[data[0]]))
+        
+        data = np.fromfile(self.file_hdl, dtype='<i4', count=2)
+        
+        # ArraySizeX
+        meta['ArraySizeX'] = data[0]
+        if verbose:
+            print('ArraySizeX:\t{}'.format(data[0]))
+        
+        # ArraySizeY
+        meta['ArraySizeY'] = data[1]
+        if verbose:
+            print('ArraySizeY:\t{}'.format(data[1]))
+            
+        # dataset
+        dataset = np.fromfile(self.file_hdl, dtype=dictDataType[meta['DataType']], count=meta['ArraySizeX']*meta['ArraySizeY'])
+        dataset = dataset.reshape((meta['ArraySizeY'], meta['ArraySizeX']))
+        
+        if self.head['DataTypeID'] == 0x4122:
+            dataset = np.flipud(dataset)
+
+        return dataset, meta
+
+
+    def getTag(self, index):
+        '''Retrieve tag from data file.
+
+        input:
+        - index (int)   index of tag
 
         returns:
-        - img		image as array
+        - tag		tag as dict
         '''
 
         raise RuntimeError('Not implemented yet!')
-
 
