@@ -36,6 +36,7 @@ class test(unittest.TestCase):
             fser.getDataset('foo')
         
         dataset, meta = fser.getDataset(0, verbose=True)
+        tag = fser.getTag(0, verbose=True)
         
         # try series file
         fser = emt.io.ser.fileSER('resources/Au_SAED_D910mm_100x_at_RT/step_off_1.ser', verbose=True)

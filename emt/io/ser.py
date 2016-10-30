@@ -14,6 +14,8 @@ class fileSER:
     Class to represent SER files (read only).
     '''
 
+    dictTagTypeID = {0x4152:'time only',0x4142:'time and 2D position'}
+
     def __init__(self, filename, verbose=False):
         '''Init opening the file and reading in the header.
         
@@ -108,12 +110,11 @@ class fileSER:
             print('DataTypeID:\t"{:#06x}",\t{}'.format(data[0], dictDataTypeID[data[0]]))
 
         # TagTypeID
-        dictTagTypeID = {0x4152:'time only',0x4142:'time and 2D position'}
-        if not data[1] in dictTagTypeID:
+        if not data[1] in self.dictTagTypeID:
             raise RuntimeError('Unknown TagTypeID: "{:#06x}"'.format(data[1]))
         head['TagTypeID'] = data[1]
         if verbose:
-            print('TagTypeID:\t"{:#06x}",\t{}'.format(data[1], dictTagTypeID[data[1]]))
+            print('TagTypeID:\t"{:#06x}",\t{}'.format(data[1], self.dictTagTypeID[data[1]]))
 
         # TotalNumberElements
         if not data[2] >= 0:
@@ -339,15 +340,60 @@ class fileSER:
         return dataset, meta
 
 
-    def getTag(self, index):
+    def getTag(self, index, verbose=False):
         '''Retrieve tag from data file.
 
         input:
-        - index (int)   index of tag
+        - index (int)           index of tag
+        - verbose (bool)        True to get extensive output while reading the file
 
         returns:
-        - tag		tag as dict
+        - tag		        tag as dict
         '''
 
-        raise RuntimeError('Not implemented yet!')
+        # check index, will raise Exceptions if not
+        try:
+            self.checkIndex(index)
+        except:
+            raise
 
+        if verbose:
+            print('Getting tag {} of {}.'.format(index, self.head['ValidNumberElements']))
+            
+        # go to dataset in file
+        self.file_hdl.seek(self.head['TagOffsetArray'][index],0)
+
+        # read tag
+        tag = {}
+        
+        data = np.fromfile(self.file_hdl, dtype='<i4', count=2)
+        
+        # TagTypeID
+        tag['TagTypeID'] = data[0]
+        if verbose:
+            print('TagTypeID:\t"{:#06x}",\t{}'.format(data[0], self.dictTagTypeID[data[0]]))
+            
+        # Time    
+        tag['Time'] = data[1]
+        if verbose:
+            print('Time:\t{}'.format(data[1]))
+        
+        # check for position
+        if tag['TagTypeID'] == 0x4142:
+            data = np.fromfile(self.file_hdl, dtype='<f8', count=2)
+            
+            # PositionX
+            tag['PositionX'] = data[0]
+            if verbose:
+                print('PositionX:\t{}'.format(data[0]))
+            
+            # PositionY
+            tag['PositionY'] = data[1]
+            if verbose:
+                print('PositionY:\t{}'.format(data[1]))   
+     
+        return tag
+            
+            
+            
+            
