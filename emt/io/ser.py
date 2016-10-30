@@ -408,7 +408,7 @@ class fileSER:
         '''
         
         # create the EMD file and set version attributes
-        f = h5py.File(filename, 'w')
+        f = h5py.File(filename, 'w', driver=None)
         f.attrs['version_major'] = 0
         f.attrs['version_minor'] = 2
         
@@ -428,10 +428,12 @@ class fileSER:
             dset = grp.create_dataset('data', (first_meta['ArraySizeX'], first_meta['ArraySizeY'], self.head['ValidNumberElements']), dtype=self.dictDataType[first_meta['DataType']])
         
         for i in range(self.head['ValidNumberElements']):
-            #data, meta = self.getDataset(i)
-            data = np.zeros((2048,2048))
-            dset[:,:,i] = data
+            print('converting dataset {} of {}'.format(i+1, self.head['ValidNumberElements']))
+            data, meta = self.getDataset(i)
+            dset[:,:,i] = data[:,:]
             f.flush()
+            
+        # add dimensions
         
         f.close()
             

@@ -41,8 +41,11 @@ class test(unittest.TestCase):
         fser.writeEMD('resources/output/Pt_SAED_D910mm_single.emd')
         
         # try series file
-        fser = emt.io.ser.fileSER('resources/Au_SAED_D910mm_100x_at_RT/step_off_1.ser', verbose=True)
+        fser = emt.io.ser.fileSER('resources/Au_SAED_D910mm_20x_at_800/pos01_1.ser', verbose=True)
+        fser.writeEMD('resources/output/Au_SAED_D910mm_20x_at_800.emd')
 
+        fser = emt.io.ser.fileSER('resources/Au_SAED_D910mm_100x_at_RT/step_off_1.ser', verbose=True)
+        fser.head['ValidNumberElements'] = 20
         fser.writeEMD('resources/output/Au_SAED_D910mm_100x_at_RT.emd')
 
 # to test with unittest runner
