@@ -14,7 +14,11 @@ class fileSER:
     Class to represent SER files (read only).
     '''
 
+    dictByteOrder = {0x4949 : 'little endian'}
+    dictSeriesVersion = {0x0210 : '< TIA 4.7.3', 0x0220 : '>= TIA 4.7.3'}
+    dictDataTypeID = {0x4120:'1D spectra', 0x4122:'2D images'}
     dictTagTypeID = {0x4152:'time only',0x4142:'time and 2D position'}
+    dictDataType = {1:'<u1', 2:'<u2', 3:'<u4', 4:'<i1', 5:'<i2', 6:'<i4', 7:'<f4', 8:'<f8', 9:'<c8', 10:'<c16'}
 
     def __init__(self, filename, verbose=False):
         '''Init opening the file and reading in the header.
@@ -71,12 +75,11 @@ class fileSER:
         data = np.fromfile(self.file_hdl, dtype='<i2', count=3)
 
         # ByteOrder (only little Endian expected)
-        dictByteOrder = {0x4949 : 'little endian'}
-        if not data[0] in dictByteOrder:
+        if not data[0] in self.dictByteOrder:
             raise RuntimeError('Only little Endian implemented for SER files')
         head['ByteOrder'] = data[0]
         if verbose:
-            print('ByteOrder:\t"{:#06x}",\t{}'.format(data[0], dictByteOrder[data[0]]))
+            print('ByteOrder:\t"{:#06x}",\t{}'.format(data[0], self.dictByteOrder[data[0]]))
 
         # SeriesID, check whether TIA Series Data File   
         if not data[1] == 0x0197:
@@ -86,12 +89,11 @@ class fileSER:
             print('SeriesID:\t"{:#06x},\tTIA Series Data File'.format(data[1]))
 
         # SeriesVersion
-        dictSeriesVersion = {0x0210 : '< TIA 4.7.3', 0x0220 : '>= TIA 4.7.3'}
-        if not data[2] in dictSeriesVersion:
+        if not data[2] in self.dictSeriesVersion:
             raise RuntimeError('Unknown TIA version: "{:#06x}"'.format(data[2]))
         head['SeriesVersion'] = data[2]
         if verbose:
-            print('SeriesVersion:\t"{:#06x}",\t{}'.format(data[2], dictSeriesVersion[data[2]]))
+            print('SeriesVersion:\t"{:#06x}",\t{}'.format(data[2], self.dictSeriesVersion[data[2]]))
         # version dependend fileformat for below
         if head['SeriesVersion']==0x0210:
             offset_dtype = '<i4'
@@ -102,12 +104,11 @@ class fileSER:
         data = np.fromfile(self.file_hdl, dtype='<i4', count=4)
 
         # DataTypeID
-        dictDataTypeID = {0x4120:'1D spectra', 0x4122:'2D images'}
         if not data[0] == 0x4122:
             raise RuntimeError('Only 2D images implemented so far')
         head['DataTypeID'] = data[0]
         if verbose:
-            print('DataTypeID:\t"{:#06x}",\t{}'.format(data[0], dictDataTypeID[data[0]]))
+            print('DataTypeID:\t"{:#06x}",\t{}'.format(data[0], self.dictDataTypeID[data[0]]))
 
         # TagTypeID
         if not data[1] in self.dictTagTypeID:
@@ -312,11 +313,11 @@ class fileSER:
         
         # DataType
         meta['DataType'] = data[0]
-        dictDataType = {1:'<u1', 2:'<u2', 3:'<u4', 4:'<i1', 5:'<i2', 6:'<i4', 7:'<f4', 8:'<f8', 9:'<c8', 10:'<c16'}
-        if not data[0] in dictDataType:
+        
+        if not data[0] in self.dictDataType:
             raise RuntimeError('Unknown DataType: "{}"'.format(data[0]))
         if verbose:
-            print('DataType:\t{},\t{}'.format(data[0],dictDataType[data[0]]))
+            print('DataType:\t{},\t{}'.format(data[0],self.dictDataType[data[0]]))
         
         data = np.fromfile(self.file_hdl, dtype='<i4', count=2)
         
@@ -331,7 +332,7 @@ class fileSER:
             print('ArraySizeY:\t{}'.format(data[1]))
             
         # dataset
-        dataset = np.fromfile(self.file_hdl, dtype=dictDataType[meta['DataType']], count=meta['ArraySizeX']*meta['ArraySizeY'])
+        dataset = np.fromfile(self.file_hdl, dtype=self.dictDataType[meta['DataType']], count=meta['ArraySizeX']*meta['ArraySizeY'])
         dataset = dataset.reshape((meta['ArraySizeY'], meta['ArraySizeX']))
         
         if self.head['DataTypeID'] == 0x4122:
