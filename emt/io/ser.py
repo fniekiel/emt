@@ -478,22 +478,35 @@ class fileSER:
         f.flush()
         del dset_buf
         
-        ## number of dimensions
-        #n = self.head['NumberDimensions']
-        #if self.head['DataTypeID'] == 0x4122:
-        #    n += 2
-        #else:
-        #    raise RuntimeError('Only 2D datasets implemented yet!')
-        
         n = 0
-        for i in range(len(first_meta['ArrayShape'])):
-            dim = self.createDim(first_meta['ArrayShape'][i], first_meta['Calibration'][i]['CalibrationOffset'], first_meta['Calibration'][i]['CalibrationDelta'], first_meta['Calibration'][i]['CalibrationElement'])
-            grp.create_dataset('dim{:d}'.format(n), data=dim)
+        
+        if self.head['DataTypeID'] == 0x4122:
+            # 2d datasets
+            dim = self.createDim(first_meta['ArrayShape'][0], first_meta['Calibration'][0]['CalibrationOffset'], first_meta['Calibration'][0]['CalibrationDelta'], first_meta['Calibration'][0]['CalibrationElement'])
+            dim_hdl = grp.create_dataset('dim{:d}'.format(n), data=dim)
+            dim_hdl.attrs['name']='x'
+            dim_hdl.attrs['units']='[m]'
             n +=1
+            
+            dim = self.createDim(first_meta['ArrayShape'][1], first_meta['Calibration'][1]['CalibrationOffset'], first_meta['Calibration'][1]['CalibrationDelta'], first_meta['Calibration'][1]['CalibrationElement'])
+            dim_hdl = grp.create_dataset('dim{:d}'.format(n), data=dim)
+            dim_hdl.attrs['name']='y'
+            dim_hdl.attrs['units']='[m]'
+            n +=1
+            
+        ### old loop to add dimensions, had to hardcode labels
+        #for i in range(len(first_meta['ArrayShape'])):
+        #    dim = self.createDim(first_meta['ArrayShape'][i], first_meta['Calibration'][i]['CalibrationOffset'], first_meta['Calibration'][i]['CalibrationDelta'], first_meta['Calibration'][i]['CalibrationElement'])
+        #    grp.create_dataset('dim{:d}'.format(n), data=dim)
+        #    grp['dim{:d}'.format(n)].attrs['name']='spacial'
+        #    grp['dim{:d}'.format(n)].attrs['units']='test'
+        #    n +=1
             
         for i in range(self.head['NumberDimensions']):
             dim = self.createDim(self.head['Dimensions'][i]['DimensionSize'], self.head['Dimensions'][i]['CalibrationOffset'], self.head['Dimensions'][i]['CalibrationDelta'], self.head['Dimensions'][i]['CalibrationElement'])
             grp.create_dataset('dim{:d}'.format(n), data=dim)
+            grp['dim{:d}'.format(n)].attrs['name']=self.head['Dimensions'][i]['Description']
+            grp['dim{:d}'.format(n)].attrs['units']='[{}]'.format(self.head['Dimensions'][i]['Units'])
             n +=1
         
         f.close()
