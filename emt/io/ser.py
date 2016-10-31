@@ -533,17 +533,18 @@ class fileSER:
             n +=1
         
         
+        # hardcoded dim3_ in here, need to adapt later
         # add additional dimension datasets
-        dim_hdl = grp.create_dataset('time', data=time)
+        dim_hdl = grp.create_dataset('dim3_time', data=time)
         dim_hdl.attrs['name']=np.string_('timestamp')
         dim_hdl.attrs['units']=np.string_('[s]')
         
         if self.head['TagTypeID'] == 0x4142:
-            dim_hdl = grp.create_dataset('positionx', data=positionx)
+            dim_hdl = grp.create_dataset('dim3_positionx', data=positionx)
             dim_hdl.attrs['name']=np.string_('Position X')
             dim_hdl.attrs['units']=np.string_('[m]')
         
-            dim_hdl = grp.create_dataset('positiony', data=positiony)
+            dim_hdl = grp.create_dataset('dim3_positiony', data=positiony)
             dim_hdl.attrs['name']=np.string_('Position Y')
             dim_hdl.attrs['units']=np.string_('[m]')
         
