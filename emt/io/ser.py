@@ -444,7 +444,7 @@ class fileSER:
         f.attrs['version_minor'] = 2
         
         # create a subgroup to not save data in root
-        from_SER = f.create_group('from_SER')
+        from_SER = f.create_group('data')
         
         # subgroup for the file
         grp = from_SER.create_group(os.path.basename(self.file_hdl.name))
@@ -460,6 +460,17 @@ class fileSER:
         else:
             raise RuntimeError('Only 2D datasets implemented yet!')
         
+        # arrays to collect interesting meta data while looping images
+        time = np.zeros(self.head['ValidNumberElements'], dtype='i4')
+        if self.head['TagTypeID'] == 0x4142:
+            positionx = np.zeros(self.head['ValidNumberElements'], dtype='f8')
+            positionx[:] = np.nan
+            positiony = np.zeros(self.head['ValidNumberElements'], dtype='f8')
+            positiony[:] = np.nan
+            
+        
+        # loop over datasets in ser file to retrieve them
+        
         ### h5py performance issues, switching to a memory based approach
         #for i in range(self.head['ValidNumberElements']):
         #    print('converting dataset {} of {}'.format(i+1, self.head['ValidNumberElements']))
@@ -471,27 +482,39 @@ class fileSER:
         dset_buf = np.zeros( dset.shape, dtype=dset.dtype )
         for i in range(self.head['ValidNumberElements']):
             print('converting dataset {} of {}'.format(i+1, self.head['ValidNumberElements']))
+            
+            # retrieve dataset and put into buffer
             data, meta = self.getDataset(i)
             dset_buf[:,:,i] = data[:,:]
             
+            # get tag data per image
+            tag = self.getTag(i)
+            time[i] = tag['Time']
+            if tag['TagTypeID'] == 0x4142:
+                positionx[i] = tag['PositionX']
+                positiony[i] = tag['PositionY']
+        
+        # write buffer to h5
         dset[:,:,:] = dset_buf[:,:,:]
         f.flush()
         del dset_buf
         
+        
+        # add dimension datasets
         n = 0
         
         if self.head['DataTypeID'] == 0x4122:
             # 2d datasets
             dim = self.createDim(first_meta['ArrayShape'][0], first_meta['Calibration'][0]['CalibrationOffset'], first_meta['Calibration'][0]['CalibrationDelta'], first_meta['Calibration'][0]['CalibrationElement'])
             dim_hdl = grp.create_dataset('dim{:d}'.format(n), data=dim)
-            dim_hdl.attrs['name']='x'
-            dim_hdl.attrs['units']='[m]'
+            dim_hdl.attrs['name']=np.string_('x')
+            dim_hdl.attrs['units']=np.string_('[m]')
             n +=1
             
             dim = self.createDim(first_meta['ArrayShape'][1], first_meta['Calibration'][1]['CalibrationOffset'], first_meta['Calibration'][1]['CalibrationDelta'], first_meta['Calibration'][1]['CalibrationElement'])
             dim_hdl = grp.create_dataset('dim{:d}'.format(n), data=dim)
-            dim_hdl.attrs['name']='y'
-            dim_hdl.attrs['units']='[m]'
+            dim_hdl.attrs['name']=np.string_('y')
+            dim_hdl.attrs['units']=np.string_('[m]')
             n +=1
             
         ### old loop to add dimensions, had to hardcode labels
@@ -505,9 +528,24 @@ class fileSER:
         for i in range(self.head['NumberDimensions']):
             dim = self.createDim(self.head['Dimensions'][i]['DimensionSize'], self.head['Dimensions'][i]['CalibrationOffset'], self.head['Dimensions'][i]['CalibrationDelta'], self.head['Dimensions'][i]['CalibrationElement'])
             grp.create_dataset('dim{:d}'.format(n), data=dim)
-            grp['dim{:d}'.format(n)].attrs['name']=self.head['Dimensions'][i]['Description']
-            grp['dim{:d}'.format(n)].attrs['units']='[{}]'.format(self.head['Dimensions'][i]['Units'])
+            grp['dim{:d}'.format(n)].attrs['name']=np.string_(self.head['Dimensions'][i]['Description'])
+            grp['dim{:d}'.format(n)].attrs['units']=np.string_('[{}]'.format(self.head['Dimensions'][i]['Units']))
             n +=1
+        
+        
+        # add additional dimension datasets
+        dim_hdl = grp.create_dataset('time', data=time)
+        dim_hdl.attrs['name']=np.string_('timestamp')
+        dim_hdl.attrs['units']=np.string_('[s]')
+        
+        if self.head['TagTypeID'] == 0x4142:
+            dim_hdl = grp.create_dataset('positionx', data=positionx)
+            dim_hdl.attrs['name']=np.string_('Position X')
+            dim_hdl.attrs['units']=np.string_('[m]')
+        
+            dim_hdl = grp.create_dataset('positiony', data=positiony)
+            dim_hdl.attrs['name']=np.string_('Position Y')
+            dim_hdl.attrs['units']=np.string_('[m]')
         
         f.close()
             
