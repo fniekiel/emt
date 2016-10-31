@@ -485,7 +485,7 @@ class fileSER:
             
             # retrieve dataset and put into buffer
             data, meta = self.getDataset(i)
-            dset_buf[:,:,i] = data[:,:]
+            dset_buf[:,:,i] = data[:,:].transpose()
             
             # get tag data per image
             tag = self.getTag(i)
@@ -501,7 +501,7 @@ class fileSER:
         
         
         # add dimension datasets
-        n = 0
+        n = 1
         
         if self.head['DataTypeID'] == 0x4122:
             # 2d datasets
