@@ -6,7 +6,7 @@ Following the information provided by Dr Chris Boothroyd (http://www.er-c.org/cb
 import numpy as np
 import h5py
 import os
-
+import re
 
 class NotSERError(Exception):
     '''Exception if a file is not in SER file format'''
@@ -428,6 +428,57 @@ class fileSER:
         dim += (offset - dim[element])
         
         return dim
+    
+    
+    def readEMI(self, filename):
+        '''Read the meta data from an EMI file.
+        
+        input:
+        - filename (string)     name of the EMI file
+        
+        return:
+        - emi           dict of metadata
+        '''
+        
+        # check for string
+        if not isinstance(filename, str):
+            raise TypeError('Filename is supposed to be a string')
+
+        # try opening the file
+        try:
+            # open file for reading bytes, as binary and text are intermixed
+            f_emi = open(filename, 'rb')
+        except IOError:
+            print('Error reading file: "{}"'.format(filename))
+            raise
+        except :
+            raise
+        
+        # dict to store emi stuff
+        emi = {}
+        
+        # need anything readable from <ObjectInfo> to </ObjectInfo>
+        collect = False
+        data = b''
+        for line in f_emi:
+            if b'<ObjectInfo>' in line:
+                collect = True
+            if collect:
+                data += line.rstrip()
+            if b'</ObjectInfo>' in line:
+                collect = False
+            
+        # strip of binary stuff still around
+        data = data.decode('ascii', errors='ignore')
+        matchObj = re.search('<ObjectInfo>(.+)</ObjectInfo', data)
+        try:
+            data = matchObj.group(1)
+        except:
+            raise RuntimeError('Could not find EMI metadata in specified file.')
+        
+        f_emi.close()
+        
+        return emi
         
         
     def writeEMD(self, filename):
