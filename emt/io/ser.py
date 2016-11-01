@@ -7,6 +7,8 @@ import numpy as np
 import h5py
 import os
 import re
+import xml.etree.ElementTree as ET
+import datetime
 
 class NotSERError(Exception):
     '''Exception if a file is not in SER file format'''
@@ -24,7 +26,7 @@ class fileSER:
     dictTagTypeID = {0x4152:'time only',0x4142:'time and 2D position'}
     dictDataType = {1:'<u1', 2:'<u2', 3:'<u4', 4:'<i1', 5:'<i2', 6:'<i4', 7:'<f4', 8:'<f8', 9:'<c8', 10:'<c16'}
 
-    def __init__(self, filename, verbose=False):
+    def __init__(self, filename, emifile=None, verbose=False):
         '''Init opening the file and reading in the header.
         
         input:
@@ -33,6 +35,7 @@ class fileSER:
         '''
         # necessary declarations, if something fails
         self.file_hdl = None
+        self.emi = None
 
         # check for string
         if not isinstance(filename, str):
@@ -49,6 +52,10 @@ class fileSER:
 
         # read header
         self.head = self.readHeader(verbose)
+        
+        # read emi, if provided
+        if emifile:
+            self.emi = self.readEMI(emifile)
 
 
     def __del__(self):
@@ -429,6 +436,29 @@ class fileSER:
         
         return dim
     
+    def parseEntryEMI(self, value):
+        '''Auxiliary function to parse string entry to int, float or np.string_.
+        
+        input:
+        - value (string)        string containing an int, float or string
+        
+        return:
+        - p                     int, float or string of value
+        '''
+        
+        # try to parse as int
+        try:
+            p = int(value)
+        except:
+            # if not int, then try float
+            try:
+                p = float(value)
+            except:
+                # if neither int nor float, stay with string
+                p = np.string_(str(value))
+        
+        return p
+        
     
     def readEMI(self, filename):
         '''Read the meta data from an EMI file.
@@ -464,9 +494,12 @@ class fileSER:
             if b'<ObjectInfo>' in line:
                 collect = True
             if collect:
-                data += line.rstrip()
+                data += line.strip()
             if b'</ObjectInfo>' in line:
                 collect = False
+
+        # close the file
+        f_emi.close()
             
         # strip of binary stuff still around
         data = data.decode('ascii', errors='ignore')
@@ -475,9 +508,43 @@ class fileSER:
             data = matchObj.group(1)
         except:
             raise RuntimeError('Could not find EMI metadata in specified file.')
+
+        # parse metadata as xml
+        root = ET.fromstring('<emi>'+data+'</emi>')
         
-        f_emi.close()
+        # single items
+        emi['Uuid'] = root.findtext('Uuid')
+        emi['AcquireDate'] = root.findtext('AcquireDate')
+        emi['Manufacturer'] = root.findtext('Manufacturer')
+        emi['DetectorPixelHeigth'] = root.findtext('DetectorPixelHeight')
+        emi['DetectorPixelWidth'] = root.findtext('DetectorPixelWidth')
+
+        # Microscope Conditions
+        grp = root.find('ExperimentalConditions/MicroscopeConditions')
         
+        for elem in grp:
+            emi[elem.tag] = self.parseEntryEMI(elem.text)
+            #print('{}:\t{}'.format(elem.tag, elem.text)) 
+
+        # Experimental Description
+        grp = root.find('ExperimentalDescription/Root')
+        
+        for elem in grp:
+            emi['{} [{}]'.format(elem.findtext('Label'), elem.findtext('Unit'))] = self.parseEntryEMI(elem.findtext('Value'))
+            #print('{} [{}]: \t{}'.format(elem.findtext('Label'), elem.findtext('Unit'), elem.findtext('Value')))
+
+        # AcquireInfo
+        grp = root.find('AcquireInfo')
+        
+        for elem in grp:
+            emi[elem.tag] = self.parseEntryEMI(elem.text)
+            
+        # DetectorRange
+        grp = root.find('DetectorRange')
+        
+        for elem in grp:
+            emi['DetectorRange_'+elem.tag] = self.parseEntryEMI(elem.text)
+
         return emi
         
         
@@ -495,10 +562,10 @@ class fileSER:
         f.attrs['version_minor'] = 2
         
         # create a subgroup to not save data in root
-        from_SER = f.create_group('data')
+        grp_data = f.create_group('data')
         
         # subgroup for the file
-        grp = from_SER.create_group(os.path.basename(self.file_hdl.name))
+        grp = grp_data.create_group(os.path.basename(self.file_hdl.name))
         
         # mark as EMD group
         grp.attrs['emd_group_type'] = 1
@@ -598,6 +665,17 @@ class fileSER:
             dim_hdl = grp.create_dataset('dim3_positiony', data=positiony)
             dim_hdl.attrs['name']=np.string_('Position Y')
             dim_hdl.attrs['units']=np.string_('[m]')
+            
+        
+        # put meta information from EMI to Microscope group, if available
+        if self.emi:
+            grp_microscope = grp.create_group('microscope')
+            for key in self.emi:
+                grp_microscope.attrs[key] = self.emi[key]
+                
+        # write comment into Comment group
+        grp_comment = f.create_group('comments')
+        grp_comment.attrs[str(datetime.datetime.utcnow())+' (UTC)'] = np.string_('Converted SER file "{}" to EMD using the emt library.'.format(self.file_hdl.name))
         
         f.close()
             

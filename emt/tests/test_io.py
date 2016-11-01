@@ -4,6 +4,7 @@ Tests for the io module.
 
 import unittest
 import emt.io.ser
+import numpy as np
 
 class test(unittest.TestCase):
 
@@ -25,7 +26,7 @@ class test(unittest.TestCase):
             fser = emt.io.ser.fileSER('resources/Pt_SAED_D910mm_single/im01.emi', verbose=True)
 
         # try single image file
-        fser = emt.io.ser.fileSER('resources/Pt_SAED_D910mm_single/im01_1.ser', verbose=True)
+        fser = emt.io.ser.fileSER('resources/Pt_SAED_D910mm_single/im01_1.ser', 'resources/Pt_SAED_D910mm_single/im01.emi', verbose=True)
         
         
         ## try EMI stuff
@@ -35,7 +36,13 @@ class test(unittest.TestCase):
         with self.assertRaises(IOError):
             fser.readEMI('')
         
+        # auxiliary function
+        self.assertIsInstance(fser.parseEntryEMI('42'), int)
+        self.assertIsInstance(fser.parseEntryEMI('42.42'), float)
+        self.assertIsInstance(fser.parseEntryEMI('forty two'), np.string_)
+        
         fser.readEMI('resources/Pt_SAED_D910mm_single/im01.emi')
+        
         
         # wrong index
         with self.assertRaises(IndexError):
@@ -51,12 +58,12 @@ class test(unittest.TestCase):
         fser.writeEMD('resources/output/Pt_SAED_D910mm_single.emd')
         
         # try series file
-        fser = emt.io.ser.fileSER('resources/Au_SAED_D910mm_20x_at_800/pos01_1.ser', verbose=True)
+        fser = emt.io.ser.fileSER('resources/Au_SAED_D910mm_20x_at_800/pos01_1.ser','resources/Au_SAED_D910mm_20x_at_800/pos01.emi', verbose=True)
         fser.writeEMD('resources/output/Au_SAED_D910mm_20x_at_800.emd')
 
-        #fser = emt.io.ser.fileSER('resources/Au_SAED_D910mm_100x_at_RT/step_off_1.ser', verbose=True)
+        fser = emt.io.ser.fileSER('resources/Au_SAED_D910mm_100x_at_RT/step_off_1.ser','resources/Au_SAED_D910mm_100x_at_RT/step_off.emi', verbose=True)
         ##fser.head['ValidNumberElements'] = 20
-        #fser.writeEMD('resources/output/Au_SAED_D910mm_100x_at_RT.emd')
+        fser.writeEMD('resources/output/Au_SAED_D910mm_100x_at_RT.emd')
         
 
 # to test with unittest runner
