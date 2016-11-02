@@ -557,7 +557,11 @@ class fileSER:
         '''
         
         # create the EMD file and set version attributes
-        f = h5py.File(filename, 'w', driver=None)
+        try:
+            f = h5py.File(filename, 'w', driver=None)
+        except:
+            raise IOError('Cannot write to file "{}"!'.format(filename))
+            
         f.attrs['version_major'] = 0
         f.attrs['version_minor'] = 2
         
