@@ -1,5 +1,5 @@
 '''
-Tests for the io module.
+Tests for the ser io module.
 '''
 
 import unittest
