@@ -22,7 +22,7 @@ class test_emd(unittest.TestCase):
             
         # impossible file for read/write
         with self.assertRaises(IOError):
-            femd = emt.io.emd.fileEMD('resources/output/output/')
+            femd = emt.io.emd.fileEMD('resources/output/output/output.emd')
             
         
             
