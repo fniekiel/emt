@@ -40,7 +40,7 @@ class fileEMD:
         
         # check for string
         if not isinstance(filename, str):
-            raise TypeError('Filename is supposed to be a string')
+            raise TypeError('Filename is supposed to be a string!')
 
         # try opening the file
         if readonly:
@@ -138,10 +138,47 @@ class fileEMD:
         return emds
 
 
+    def get_emdgroup(self, group):
+        '''Get the emdtype data saved in in group.
+        
+        input:
+        - group         reference to the HDF5 group
+        
+        returns:
+        - data
+        '''
+        
+        # check input
+        if not isinstance(group, h5py._hl.group.Group):
+            raise TypeError('group needs to refer to a valid HDF5 group!')
+            
+        if not 'emd_group_type' in group.attrs:
+            raise TypeError('group is not a emd_group_type group!')
+        if not group.attrs['emd_group_type'] == 1:
+            raise TypeError('group is not a emd_group_type group!')
 
-
-
-
+        # retrieve data
+        try:
+            # get the data
+            data = group['data'][:]
+            
+            # get the dims
+            dims = []
+            for i in range(len(data.shape)):
+                dim = group['dim{}'.format(i+1)]
+                # save them as (vector, name, units)
+                dims.append( (dim[:], dim.attrs['name'], dim.attrs['units']) )
+            
+            dims = tuple(dims)
+            
+            return data, dims
+            
+        except:
+        
+            # if something goes wrong, return None
+            print('Content of "{}" does not seem to be in emd specified shape'.format(group.name))
+            
+            return None
 
 
 

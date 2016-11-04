@@ -32,6 +32,19 @@ class test_emd(unittest.TestCase):
         femd = emt.io.emd.fileEMD('resources/output/test.emd')
 
 
+    def test_getdata(self):
+    
+        # open a testfile
+        femd = emt.io.emd.fileEMD('resources/Au_SAED_D910mm_20x_at_800/Au_SAED_D910mm_20x_at_800.emd', readonly=True)
+        
+        # wrong group
+        with self.assertRaises(TypeError):
+            data, dims = femd.get_emdgroup(femd.file_hdl)
+        
+        # working
+        data, dims = femd.get_emdgroup(femd.list_emds[0])
+
+
 # to test with unittest runner
 if __name__ == '__main__':
     unittest.main()
