@@ -24,8 +24,6 @@ class test_emd(unittest.TestCase):
         with self.assertRaises(IOError):
             femd = emt.io.emd.fileEMD('resources/output/output/output.emd')
             
-        
-            
         # open existing file
         femd = emt.io.emd.fileEMD('resources/Au_SAED_D910mm_20x_at_800/Au_SAED_D910mm_20x_at_800.emd')
         # open existing file readonly
