@@ -3,6 +3,8 @@ Tests for the emd io module.
 '''
 
 import unittest
+import os
+import numpy as np
 import emt.io.emd
 
 class test_emd(unittest.TestCase):
@@ -32,18 +34,66 @@ class test_emd(unittest.TestCase):
         femd = emt.io.emd.fileEMD('resources/output/test.emd')
 
 
-    def test_getdata(self):
+    def test_data_manipulation(self):
     
-        # open a testfile
+        # open testfiles
         femd = emt.io.emd.fileEMD('resources/Au_SAED_D910mm_20x_at_800/Au_SAED_D910mm_20x_at_800.emd', readonly=True)
+        os.remove('resources/output/copy.emd')
+        femd2 = emt.io.emd.fileEMD('resources/output/copy.emd')
         
-        # wrong group
+        # test error handling in get_emdgroup
         with self.assertRaises(TypeError):
             data, dims = femd.get_emdgroup(femd.file_hdl)
         
         # working
         data, dims = femd.get_emdgroup(femd.list_emds[0])
-
+        
+        # test error handling in put_emdgroup
+        with self.assertRaises(TypeError):
+            femd2.put_emdgroup(42, data,  dims)
+            
+        with self.assertRaises(TypeError):
+            femd2.put_emdgroup('Au_SAED_D910mm_20x_at_800', 42, dims)
+        
+        with self.assertRaises(TypeError):
+            femd2.put_emdgroup('Au_SAED_D910mm_20x_at_800', data, dims[0:1])
+        
+        # working
+        self.assertIsNotNone(femd2.put_emdgroup('Au_SAED_D910mm_20x_at_800', data, dims))
+        
+        # try to write a readonly file
+        femd2 = emt.io.emd.fileEMD('resources/output/copy.emd', readonly=True)
+        self.assertIsNone(femd2.put_emdgroup('Au_SAED_D910mm_20x_at_800', data, dims))
+        
+        del femd, femd2
+        
+        # write a testfile
+        os.remove('resources/output/test2.emd')
+        femd = emt.io.emd.fileEMD('resources/output/test2.emd')
+        data = np.random.rand(512,512,100)
+        dims = ( (np.array(range(512)), 'x', '[px]'),
+                 (np.array(range(512)), 'y', '[px]'),
+                 (np.linspace(0.0, 3.14, num=100), 'angle','[rad]') )
+        self.assertIsNotNone(femd.put_emdgroup('dataset_1', data, dims))
+        
+        # try to overwrite
+        self.assertIsNone(femd.put_emdgroup('dataset_1', data, dims))
+        
+        
+    def test_comments(self):
+    
+        # create a file for comments
+        os.remove('resources/output/comments.emd')
+        femd = emt.io.emd.fileEMD('resources/output/comments.emd')
+        
+        with self.assertRaises(TypeError):
+            femd.put_comment(42)
+        
+        femd.put_comment('file created')
+        femd.put_comment('how long does it take until the second comment is issued?')
+        
+        femd.put_comment('something happened', 'today')
+        femd.put_comment('even more happened', 'today')
 
 # to test with unittest runner
 if __name__ == '__main__':
