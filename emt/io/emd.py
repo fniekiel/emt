@@ -241,6 +241,9 @@ class fileEMD:
                     raise RuntimeError()
                 grp = self.data.create_group(label)
             
+            # add attribute
+            grp.attrs['emd_group_type'] = 1
+            
             # create dataset
             dset = grp.create_dataset('data', data=data)
             

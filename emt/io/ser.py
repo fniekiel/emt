@@ -9,6 +9,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 import datetime
+import emt.io.emd
 
 class NotSERError(Exception):
     '''Exception if a file is not in SER file format'''
@@ -558,30 +559,19 @@ class fileSER:
         
         # create the EMD file and set version attributes
         try:
-            f = h5py.File(filename, 'w', driver=None)
+            f = emt.io.emd.fileEMD(filename)
         except:
             raise IOError('Cannot write to file "{}"!'.format(filename))
             
-        f.attrs['version_major'] = 0
-        f.attrs['version_minor'] = 2
-        
-        # create a subgroup to not save data in root
-        grp_data = f.create_group('data')
-        
-        # subgroup for the file
-        grp = grp_data.create_group(os.path.basename(self.file_hdl.name))
-        
-        # mark as EMD group
-        grp.attrs['emd_group_type'] = 1
         
         # use first dataset to layout memory
         data, first_meta = self.getDataset(0)
         
         if self.head['DataTypeID'] == 0x4122:
-            dset = grp.create_dataset('data', (first_meta['ArrayShape'][0], first_meta['ArrayShape'][1], self.head['ValidNumberElements']), dtype=self.dictDataType[first_meta['DataType']])
+            dset_buf = np.zeros( (first_meta['ArrayShape'][0], first_meta['ArrayShape'][1], self.head['ValidNumberElements']), dtype=self.dictDataType[first_meta['DataType']] )
         else:
             raise RuntimeError('Only 2D datasets implemented yet!')
-        
+       
         # arrays to collect interesting meta data while looping images
         time = np.zeros(self.head['ValidNumberElements'], dtype='i4')
         if self.head['TagTypeID'] == 0x4142:
@@ -591,17 +581,8 @@ class fileSER:
             positiony[:] = np.nan
             
         
-        # loop over datasets in ser file to retrieve them
-        
-        ### h5py performance issues, switching to a memory based approach
-        #for i in range(self.head['ValidNumberElements']):
-        #    print('converting dataset {} of {}'.format(i+1, self.head['ValidNumberElements']))
-        #    data, meta = self.getDataset(i)
-        #    dset[:,:,i] = data[:,:]
-        #    f.flush()
-        
+        # loop over datasets in ser file to retrieve them        
         ### if series size is to large, this will lead to heavy swapping   
-        dset_buf = np.zeros( dset.shape, dtype=dset.dtype )
         for i in range(self.head['ValidNumberElements']):
             print('converting dataset {} of {}'.format(i+1, self.head['ValidNumberElements']))
             
@@ -616,70 +597,57 @@ class fileSER:
                 positionx[i] = tag['PositionX']
                 positiony[i] = tag['PositionY']
         
-        # write buffer to h5
-        dset[:,:,:] = dset_buf[:,:,:]
-        f.flush()
-        del dset_buf
-        
-        
-        # add dimension datasets
-        n = 1
+        # create dimension datasets
+        dims = []
         
         if self.head['DataTypeID'] == 0x4122:
             # 2d datasets
             dim = self.createDim(first_meta['ArrayShape'][0], first_meta['Calibration'][0]['CalibrationOffset'], first_meta['Calibration'][0]['CalibrationDelta'], first_meta['Calibration'][0]['CalibrationElement'])
-            dim_hdl = grp.create_dataset('dim{:d}'.format(n), data=dim)
-            dim_hdl.attrs['name']=np.string_('x')
-            dim_hdl.attrs['units']=np.string_('[m]')
-            n +=1
-            
+            dims.append( (dim, 'x', '[m]') )
+
             dim = self.createDim(first_meta['ArrayShape'][1], first_meta['Calibration'][1]['CalibrationOffset'], first_meta['Calibration'][1]['CalibrationDelta'], first_meta['Calibration'][1]['CalibrationElement'])
-            dim_hdl = grp.create_dataset('dim{:d}'.format(n), data=dim)
-            dim_hdl.attrs['name']=np.string_('y')
-            dim_hdl.attrs['units']=np.string_('[m]')
-            n +=1
+            dims.append( (dim, 'y', '[m]') )
+        else:
+            raise RuntimeError('Only 2D datasets implemented so far!')
             
-        ### old loop to add dimensions, had to hardcode labels
-        #for i in range(len(first_meta['ArrayShape'])):
-        #    dim = self.createDim(first_meta['ArrayShape'][i], first_meta['Calibration'][i]['CalibrationOffset'], first_meta['Calibration'][i]['CalibrationDelta'], first_meta['Calibration'][i]['CalibrationElement'])
-        #    grp.create_dataset('dim{:d}'.format(n), data=dim)
-        #    grp['dim{:d}'.format(n)].attrs['name']='spacial'
-        #    grp['dim{:d}'.format(n)].attrs['units']='test'
-        #    n +=1
+        # first SER dimension is number
+        i = 0
+        assert self.head['Dimensions'][i]['Description'] == 'Number'
+        dim = self.createDim(self.head['Dimensions'][i]['DimensionSize'], self.head['Dimensions'][i]['CalibrationOffset'], self.head['Dimensions'][i]['CalibrationDelta'], self.head['Dimensions'][i]['CalibrationElement'])
+        dims.append( (dim, self.head['Dimensions'][i]['Description'], '[{}]'.format(self.head['Dimensions'][i]['Units'])) )
             
-        for i in range(self.head['NumberDimensions']):
-            dim = self.createDim(self.head['Dimensions'][i]['DimensionSize'], self.head['Dimensions'][i]['CalibrationOffset'], self.head['Dimensions'][i]['CalibrationDelta'], self.head['Dimensions'][i]['CalibrationElement'])
-            grp.create_dataset('dim{:d}'.format(n), data=dim)
-            grp['dim{:d}'.format(n)].attrs['name']=np.string_(self.head['Dimensions'][i]['Description'])
-            grp['dim{:d}'.format(n)].attrs['units']=np.string_('[{}]'.format(self.head['Dimensions'][i]['Units']))
-            n +=1
+        # for mappings there are additional spacial dimensions
+        # need to convert series to 4D beforehand    
+        
+        # dataset to file
+        f.put_emdgroup(os.path.basename(self.file_hdl.name), dset_buf, dims)
+
+        # attempt to free memory asap
+        del dset_buf, dims
         
         
         # hardcoded dim3_ in here, need to adapt later
-        # add additional dimension datasets
-        dim_hdl = grp.create_dataset('dim3_time', data=time)
-        dim_hdl.attrs['name']=np.string_('timestamp')
-        dim_hdl.attrs['units']=np.string_('[s]')
-        
-        if self.head['TagTypeID'] == 0x4142:
-            dim_hdl = grp.create_dataset('dim3_positionx', data=positionx)
-            dim_hdl.attrs['name']=np.string_('Position X')
-            dim_hdl.attrs['units']=np.string_('[m]')
-        
-            dim_hdl = grp.create_dataset('dim3_positiony', data=positiony)
-            dim_hdl.attrs['name']=np.string_('Position Y')
-            dim_hdl.attrs['units']=np.string_('[m]')
+        # and add additional dimension datasets
+        #dim_hdl = grp.create_dataset('dim3_time', data=time)
+        #dim_hdl.attrs['name']=np.string_('timestamp')
+        #dim_hdl.attrs['units']=np.string_('[s]')
+        #  
+        #if self.head['TagTypeID'] == 0x4142:
+        #    dim_hdl = grp.create_dataset('dim3_positionx', data=positionx)
+        #    dim_hdl.attrs['name']=np.string_('Position X')
+        #    dim_hdl.attrs['units']=np.string_('[m]')
+       # 
+        #    dim_hdl = grp.create_dataset('dim3_positiony', data=positiony)
+        #    dim_hdl.attrs['name']=np.string_('Position Y')
+        #    dim_hdl.attrs['units']=np.string_('[m]')
             
         
         # put meta information from EMI to Microscope group, if available
         if self.emi:
-            grp_microscope = grp.create_group('microscope')
             for key in self.emi:
-                grp_microscope.attrs[key] = self.emi[key]
+                f.microscope.attrs[key] = self.emi[key]
                 
         # write comment into Comment group
-        grp_comment = f.create_group('comments')
-        grp_comment.attrs[str(datetime.datetime.utcnow())+' (UTC)'] = np.string_('Converted SER file "{}" to EMD using the emt library.'.format(self.file_hdl.name))
+        f.put_comment('Converted SER file "{}" to EMD using the emt library.'.format(self.file_hdl.name))
         
-        f.close()
             

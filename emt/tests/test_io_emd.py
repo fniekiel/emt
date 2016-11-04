@@ -4,6 +4,7 @@ Tests for the emd io module.
 
 import unittest
 import os
+import os.path
 import numpy as np
 import emt.io.emd
 
@@ -38,7 +39,8 @@ class test_emd(unittest.TestCase):
     
         # open testfiles
         femd = emt.io.emd.fileEMD('resources/Au_SAED_D910mm_20x_at_800/Au_SAED_D910mm_20x_at_800.emd', readonly=True)
-        os.remove('resources/output/copy.emd')
+        if os.path.isfile('resources/output/copy.emd'):
+            os.remove('resources/output/copy.emd')
         femd2 = emt.io.emd.fileEMD('resources/output/copy.emd')
         
         # test error handling in get_emdgroup
@@ -68,13 +70,16 @@ class test_emd(unittest.TestCase):
         del femd, femd2
         
         # write a testfile
-        os.remove('resources/output/test2.emd')
+        if os.path.isfile('resources/output/test2.emd'):
+            os.remove('resources/output/test2.emd')
         femd = emt.io.emd.fileEMD('resources/output/test2.emd')
         data = np.random.rand(512,512,100)
         dims = ( (np.array(range(512)), 'x', '[px]'),
                  (np.array(range(512)), 'y', '[px]'),
                  (np.linspace(0.0, 3.14, num=100), 'angle','[rad]') )
         self.assertIsNotNone(femd.put_emdgroup('dataset_1', data, dims))
+        
+        femd.put_comment('file created, filled with random numbers')
         
         # try to overwrite
         self.assertIsNone(femd.put_emdgroup('dataset_1', data, dims))
@@ -83,7 +88,8 @@ class test_emd(unittest.TestCase):
     def test_comments(self):
     
         # create a file for comments
-        os.remove('resources/output/comments.emd')
+        if os.path.isfile('resources/output/comments.emd'):
+            os.remove('resources/output/comments.emd')
         femd = emt.io.emd.fileEMD('resources/output/comments.emd')
         
         with self.assertRaises(TypeError):
