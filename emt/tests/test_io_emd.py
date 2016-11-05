@@ -79,6 +79,9 @@ class test_emd(unittest.TestCase):
                  (np.linspace(0.0, 3.14, num=100), 'angle','[rad]') )
         self.assertIsNotNone(femd.put_emdgroup('dataset_1', data, dims))
         
+        dim = (np.array(range(100)), 'number', '[]')
+        femd.write_dim('dim3_number', dim, femd.list_emds[0])
+        
         femd.put_comment('file created, filled with random numbers')
         
         # try to overwrite

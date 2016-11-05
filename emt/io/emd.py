@@ -193,9 +193,12 @@ class fileEMD:
         - dset                  HDF5 dataset handle referencing this dim
         '''
         
-        dset = parent.create_dataset(label, data=dim[0])
-        dset.attrs['name'] = np.string_(dim[1])
-        dset.attrs['units'] = np.string_(dim[2])
+        try:
+            dset = parent.create_dataset(label, data=dim[0])
+            dset.attrs['name'] = np.string_(dim[1])
+            dset.attrs['units'] = np.string_(dim[2])
+        except:
+            raise RuntimeError('Error during writing dim dataset')
         
         return dset
         

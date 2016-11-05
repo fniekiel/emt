@@ -620,23 +620,20 @@ class fileSER:
         # need to convert series to 4D beforehand    
         
         # dataset to file
-        f.put_emdgroup(os.path.basename(self.file_hdl.name), dset_buf, dims)
+        grp = f.put_emdgroup(os.path.basename(self.file_hdl.name), dset_buf, dims)
 
         # attempt to free memory asap
         del dset_buf, dims
         
-        
         # hardcoded dim3_ in here, need to adapt later
         # and add additional dimension datasets
-        #dim_hdl = grp.create_dataset('dim3_time', data=time)
-        #dim_hdl.attrs['name']=np.string_('timestamp')
-        #dim_hdl.attrs['units']=np.string_('[s]')
-        #  
+        f.write_dim('dim3_time', (time, 'timestamp', '[s]'), grp)
+          
         #if self.head['TagTypeID'] == 0x4142:
         #    dim_hdl = grp.create_dataset('dim3_positionx', data=positionx)
         #    dim_hdl.attrs['name']=np.string_('Position X')
         #    dim_hdl.attrs['units']=np.string_('[m]')
-       # 
+        # 
         #    dim_hdl = grp.create_dataset('dim3_positiony', data=positiony)
         #    dim_hdl.attrs['name']=np.string_('Position Y')
         #    dim_hdl.attrs['units']=np.string_('[m]')
