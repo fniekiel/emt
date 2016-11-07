@@ -8,7 +8,22 @@ digraph modules {
     "emt.io.emd" [label="emd"];
     
     "emt.io.ser" [label="ser"];
-    "emt.io.emd" -> "emt.io.ser";
+
+    
+    }
+    
+    subgraph "cluster_emt.algo"{
+    label = "emt.algo";
+    
+    "emt.algo.local_max" [label="local_max"];
+    
+    }
+    
+    subgraph "cluster_emt.eva"{
+    label = "emt.eva";
+    
+    "emt.eva.ring_diff" [label="ring_diff"];
+
     
     }
     
@@ -16,7 +31,13 @@ digraph modules {
     label = "emt.cmdline_tools";
     
     "emt.cmdline_tools.ser2emd" [label="ser2emd"];
-    "emt.io.ser" -> "emt.cmdline_tools.ser2emd";
+
     }
     
+    "emt.io.emd" -> "emt.io.ser";
+    
+    "emt.algo.local_max" -> "emt.eva.ring_diff";
+    "emt.io.emd" -> "emt.eva.ring_diff";
+    
+    "emt.io.ser" -> "emt.cmdline_tools.ser2emd";
 }
