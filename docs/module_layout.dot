@@ -1,0 +1,22 @@
+digraph modules {
+    rankdir = BT;
+    labelloc = "b";
+
+    subgraph "cluster_emt.io"{
+    label = "emt.io";
+    
+    "emt.io.emd" [label="emd"];
+    
+    "emt.io.ser" [label="ser"];
+    "emt.io.emd" -> "emt.io.ser";
+    
+    }
+    
+    subgraph "cluster_emt.cmdline_tools" {
+    label = "emt.cmdline_tools";
+    
+    "emt.cmdline_tools.ser2emd" [label="ser2emd"];
+    "emt.io.ser" -> "emt.cmdline_tools.ser2emd";
+    }
+    
+}
