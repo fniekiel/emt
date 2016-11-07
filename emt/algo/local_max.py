@@ -16,7 +16,7 @@ def local_max():
     
     return:
     - pos
-    ''''
+    '''
     
     pos = []
     

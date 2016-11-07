@@ -13,6 +13,8 @@ def evaSinglePattern():
     return:
     '''
     
+    emt.algo.local_max.local_max()
+    
     
     return None
     
