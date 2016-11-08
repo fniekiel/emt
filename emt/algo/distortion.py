@@ -175,7 +175,15 @@ def rad_dis( theta, alpha, beta, order=2 ):
     
 def residuals_dis(param, points, ns):
     '''
-    Residual function for distortions
+    Residual function for distortions.
+    
+    input:
+    - param         parameters for distortion
+    - points        points to compare to
+    - ns            list of orders to account for
+    
+    return:
+    - residuals
     '''
 
     est = param[0]*np.ones(points[:,1].shape)
@@ -185,23 +193,127 @@ def residuals_dis(param, points, ns):
     return points[:,0] - est 
     
     
-def optimize_distortion(points, ns, maxfev=1000):
+def optimize_distortion(points, ns, maxfev=1000, verbose=False):
     '''
     Optimize distortions.
     
+    The orders in the list ns are first fitted subsequently and the result is refined in a final fit simultaneously fitting all orders.
+    
     input:
     - points        points to optimize to (in polar coords)
-    - ns            list of distortion orders to correct for
+    - ns            list of orders to correct for
     - maxfev        max number of iterations forwarded to scipy.optimize.leastsq()
+    
+    return:
+    - popt          optimized parameters according to ns
     '''
     
-    init_guess = np.ones(len(ns)*2+1)*0.1
+    # init guess for full fit
+    init_guess = np.ones(len(ns)*2+1)
     init_guess[0] = np.mean(points[:,0])
+    
+    # make a temporary copy
+    points_tmp = np.copy(points)
+    
+    if verbose:
+        print('correction for {} order distortions.'.format(ns))
+        print('starting with subsequent fitting:')
+    
+    # subsequently fit the orders
+    for i in range(len(ns)):
+        # optimize order to points_tmp
+        popt, flag = scipy.optimize.leastsq( residuals_dis, (init_guess[0], 0.1, 0.1), args=(points_tmp, (ns[i],)), maxfev=maxfev)
+        
+        if flag not in [1,2,3,4]:
+            print('WARNING: optimization of distortions failed.')
+        
+        # information
+        if verbose:
+            print('fitted order {}: R={} alpha={} beta={}'.format(ns[i], popt[0], popt[1], popt[2]))
+        
+        # save for full fit
+        init_guess[i*2+1] = popt[1]
+        init_guess[i*2+2] = popt[2]
+        
+        # do correction
+        points_tmp[:,0] /= rad_dis(points_tmp[:,1], popt[1], popt[2], ns[i])
+    
+    # full fit    
+    if verbose:
+        print('starting the full fit:')    
     
     popt, flag = scipy.optimize.leastsq( residuals_dis, init_guess, args=(points, ns), maxfev=maxfev)
     
     if flag not in [1,2,3,4]:
         print('WARNING: optimization of distortions failed.')
     
+    if verbose:
+        print('fitted to: R={}'.format(popt[0]))
+        for i in range(len(ns)):
+            print('.. order={}, alpha={}, beta={}'.format(ns[i], popt[i*2+1], popt[i*2+2]))
+
     return popt
+    
+    
+def plot_distpolar(points, dims, dists, ns, show=False):
+    '''
+    Plot the results of distortion fitting in polar coordinates.
+    
+    input:
+    - points        points used to fit to in polar coords
+    - dims          dimensions, necessary to have unit information
+    - dists         results of dist fitting, length according to ns
+    - ns            list of used orders
+    '''
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    
+    # stuff from the single orders
+    ax.axhline(dists[0], ls='--', c='k')
+    xpl_ell = np.linspace(-np.pi, np.pi, 100)
+    for i in range(len(ns)):
+        plt.plot( xpl_ell, dists[0]*rad_dis(xpl_ell, dists[i*2+1], dists[i*2+2], ns[i]), 'm--')
+
+    # points before
+    ax.plot(points[:,1], points[:,0], 'rx')
+    
+    # sum of all distorts
+    sum_dists = np.ones(xpl_ell.shape)*dists[0]
+    for i in range(len(ns)):
+        sum_dists *= rad_dis(xpl_ell, dists[i*2+1], dists[i*2+2], ns[i])
+    plt.plot( xpl_ell, sum_dists, 'b-' )
+    
+    # points after
+    points_corr = np.copy(points)
+    for i in range(len(ns)):
+        points_corr[:,0] /= rad_dis(points[:,1], dists[i*2+1], dists[i*2+2], ns[i])
+    plt.plot( points_corr[:,1], points_corr[:,0], 'gx')
+    
+    # labels
+    ax.set_xlabel('theta /[rad]')
+    ax.set_xlim( (-np.pi, np.pi) )
+    ax.set_ylabel('r /{}'.format(dims[0][2].decode('utf-8')))
+    
+    if show:
+        plt.show(block=False)
+    
+    # render to array
+    fig.canvas.draw()
+    plot = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    plot = plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    
+    return plot
+
+
+
+
+
+
+
+
+
+
+
+
     
