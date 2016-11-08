@@ -3,6 +3,8 @@ Module to handle distortions in diffraction patters.
 '''
 
 import numpy as np
+import matplotlib.pyplot as plt
+import scipy.optimize
 
 
 def filter_ring(points, center, rminmax):
@@ -59,3 +61,142 @@ def points_todim(points, dims):
     points_d = np.array( [ dims[0][0][points[:,0]], dims[1][0][points[:,1]] ] ).transpose()
     
     return points_d
+    
+    
+def points_topolar(points, center):
+    '''
+    Convert points to polar coordinate system.
+    
+    Can be either in pixel or real dim, but should be the same for points and center.
+    '''
+    
+    try:
+        # points have to be 2D array with 2 columns
+        assert(isinstance(points, np.ndarray))
+        assert(points.shape[1] == 2)
+        assert(len(points.shape) == 2)    
+        
+        # center can either be tuple or np.array    
+        center = np.array(center)
+        center = np.reshape(center, 2)
+   
+    except:
+        raise RuntimeError('Something wrong with the input!')
+    
+    # calculate radii
+    rs = np.sqrt( np.square(points[:,0]-center[0]) + np.square(points[:,1]-center[1]) )
+    # calculate angle
+    thes = np.arctan2(points[:,1]-center[1], points[:,0]-center[0])
+    
+    points_p = np.array( [rs, thes] ).transpose()
+    
+    return points_p
+    
+    
+def plot_ringpolar(points, dims, show=False): 
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.axhline(np.mean(points[:,0]), ls='--', c='k')
+    ax.plot(points[:,1], points[:,0], 'rx')
+    ax.set_xlabel('theta /[rad]')
+    ax.set_xlim( (-np.pi, np.pi) )
+    ax.set_ylabel('r /{}'.format(dims[0][2].decode('utf-8')))
+    
+    if show:
+        plt.show(block=False)
+    
+    fig.canvas.draw()
+    plot = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    plot = plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    
+    return plot
+
+
+def residuals_center( param, data):
+    '''
+    Residual function for minimizing the deviations from the mean radial distance.
+    
+    input:
+    - param     the center to optimize
+    - data      the points in x,y coordinates of the original image
+    '''
+    
+    # manually calculating the radii, as we do not need the thetas
+    rs = np.sqrt( np.square(data[:,0]-param[0]) + np.square(data[:,1]-param[1]) )
+    
+    return (rs-np.mean(rs))
+    
+    
+def optimize_center(points, center, maxfev=1000):
+    '''
+    Optimize the center by minimizing the sum of square deviations from the mean radial distance.
+    
+    input:
+    - points        the points to which the optimization is done (x,y coords in org image)
+    - center        initial center guess
+    - maxfev        max number of iterations forwarded to scipy.optimize.leastsq()
+    
+    return:
+    - opt_center    the optimized center
+    '''
+
+    try:
+        # points have to be 2D array with 2 columns
+        assert(isinstance(points, np.ndarray))
+        assert(points.shape[1] == 2)
+        assert(len(points.shape) == 2)    
+        
+        # center can either be tuple or np.array    
+        center = np.array(center)
+        center = np.reshape(center, 2)
+   
+    except:
+        raise RuntimeError('Something wrong with the input!')
+
+    # run the optimization
+    popt, flag = scipy.optimize.leastsq( residuals_center, center, args=(points), maxfev=maxfev)
+    
+    if flag not in [1,2,3,4]:
+        print('WARNING: center optimization failed.')
+
+    return popt
+    
+
+def rad_dis( theta, alpha, beta, order=2 ):
+    '''
+    Radial distortion due to ellipticity or higher order distortion.
+    
+    Relative distortion, to be multiplied with radial distance.
+    '''
+    
+    return (1.-np.square(beta))/np.sqrt(1.+np.square(beta)-2.*beta*np.cos(order*(theta+alpha)))
+
+    
+def residuals_dis(param, points, n):
+    '''
+    Residual function for distortions
+    '''
+
+    return points[:,0] - param[0]*rad_dis( points[:,1], param[1], param[2], n)
+
+    
+def optimize_distortion(points, ns, maxfev=1000):
+    '''
+    Optimize distortions.
+    
+    input:
+    - points        points to optimize to (in polar coords)
+    - ns            list of distortion orders to correct for
+    - maxfev        max number of iterations forwarded to scipy.optimize.leastsq()
+    '''
+    
+    n = ns[0]
+    
+    popt, flag = scipy.optimize.leastsq( residuals_dis, (np.mean(points[:,0]), np.pi/4.0, 0.1), args=(points, n), maxfev=maxfev)
+    
+    if flag not in [1,2,3,4]:
+        print('WARNING: optimization of distortions failed.')
+    
+    return popt
+    
