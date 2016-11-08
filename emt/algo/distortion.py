@@ -173,13 +173,17 @@ def rad_dis( theta, alpha, beta, order=2 ):
     return (1.-np.square(beta))/np.sqrt(1.+np.square(beta)-2.*beta*np.cos(order*(theta+alpha)))
 
     
-def residuals_dis(param, points, n):
+def residuals_dis(param, points, ns):
     '''
     Residual function for distortions
     '''
 
-    return points[:,0] - param[0]*rad_dis( points[:,1], param[1], param[2], n)
-
+    est = param[0]*np.ones(points[:,1].shape)
+    for i in range(len(ns)):
+        est *=rad_dis( points[:,1], param[i*2+1], param[i*2+2], ns[i])
+            
+    return points[:,0] - est 
+    
     
 def optimize_distortion(points, ns, maxfev=1000):
     '''
@@ -191,9 +195,10 @@ def optimize_distortion(points, ns, maxfev=1000):
     - maxfev        max number of iterations forwarded to scipy.optimize.leastsq()
     '''
     
-    n = ns[0]
+    init_guess = np.ones(len(ns)*2+1)*0.1
+    init_guess[0] = np.mean(points[:,0])
     
-    popt, flag = scipy.optimize.leastsq( residuals_dis, (np.mean(points[:,0]), np.pi/4.0, 0.1), args=(points, n), maxfev=maxfev)
+    popt, flag = scipy.optimize.leastsq( residuals_dis, init_guess, args=(points, ns), maxfev=maxfev)
     
     if flag not in [1,2,3,4]:
         print('WARNING: optimization of distortions failed.')

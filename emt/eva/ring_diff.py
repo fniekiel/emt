@@ -48,7 +48,7 @@ def run_SingleImage(img, dims, verbose=False):
     dists = emt.algo.distortion.optimize_distortion(points_plr, (2,))
     if verbose:
         print('optimized distortion: R={} alpha={}, beta={}'.format(dists[0], dists[1], dists[2]))
-    
+        
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.axhline(np.mean(points_plr[:,0]), ls='--', c='k')
@@ -56,6 +56,58 @@ def run_SingleImage(img, dims, verbose=False):
     xpl_ell = np.linspace(-np.pi, np.pi, 100)
     plt.plot( xpl_ell, dists[0]*emt.algo.distortion.rad_dis(xpl_ell, dists[1], dists[2], 2), 'b-') 
     plt.plot( points_plr[:,1], points_plr[:,0]/emt.algo.distortion.rad_dis(points_plr[:,1], dists[1], dists[2], 2), 'gx')
+    ax.set_xlabel('theta /[rad]')
+    ax.set_xlim( (-np.pi, np.pi) )
+    ax.set_ylabel('r /{}'.format(dims[0][2].decode('utf-8')))
+        
+        
+    ns = (2,3)
+        
+    dists = emt.algo.distortion.optimize_distortion(points_plr, ns)
+    print('optimized distortion: R={}'.format(dists[0]))
+    for i in range(len(ns)):
+        print('.. order={}, alpha={}, beta={}'.format(ns[i], dists[i*2+1], dists[i*2+2]))
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.axhline(np.mean(points_plr[:,0]), ls='--', c='k')
+    ax.plot(points_plr[:,1], points_plr[:,0], 'rx')
+    xpl_ell = np.linspace(-np.pi, np.pi, 100)
+    for i in range(len(ns)):
+        plt.plot( xpl_ell, dists[0]*emt.algo.distortion.rad_dis(xpl_ell, dists[i*2+1], dists[i*2+2], ns[i]), 'b-')
+    
+    points_corr = np.copy(points_plr)
+    for i in range(len(ns)):
+        points_corr[:,0] /= emt.algo.distortion.rad_dis(points_plr[:,1], dists[i*2+1], dists[i*2+2], ns[i])
+        
+    plt.plot( points_corr[:,1], points_corr[:,0], 'gx')
+    
+    ax.set_xlabel('theta /[rad]')
+    ax.set_xlim( (-np.pi, np.pi) )
+    ax.set_ylabel('r /{}'.format(dims[0][2].decode('utf-8')))
+    
+    
+    ns = (2,3,4)
+        
+    dists = emt.algo.distortion.optimize_distortion(points_plr, ns)
+    print('optimized distortion: R={}'.format(dists[0]))
+    for i in range(len(ns)):
+        print('.. order={}, alpha={}, beta={}'.format(ns[i], dists[i*2+1], dists[i*2+2]))
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.axhline(np.mean(points_plr[:,0]), ls='--', c='k')
+    ax.plot(points_plr[:,1], points_plr[:,0], 'rx')
+    xpl_ell = np.linspace(-np.pi, np.pi, 100)
+    for i in range(len(ns)):
+        plt.plot( xpl_ell, dists[0]*emt.algo.distortion.rad_dis(xpl_ell, dists[i*2+1], dists[i*2+2], ns[i]), 'b-')
+    
+    points_corr = np.copy(points_plr)
+    for i in range(len(ns)):
+        points_corr[:,0] /= emt.algo.distortion.rad_dis(points_plr[:,1], dists[i*2+1], dists[i*2+2], ns[i])
+        
+    plt.plot( points_corr[:,1], points_corr[:,0], 'gx')
+    
     ax.set_xlabel('theta /[rad]')
     ax.set_xlim( (-np.pi, np.pi) )
     ax.set_ylabel('r /{}'.format(dims[0][2].decode('utf-8')))
