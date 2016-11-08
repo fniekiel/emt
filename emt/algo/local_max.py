@@ -69,7 +69,10 @@ def plot_points(img, points, vminmax=(0,1), show=False):
     ax.scatter(points[:,1], points[:,0], color='r', marker='o', facecolors='none')
     
     if show:
-        plt.show()
+        try:
+            plt.show(block=False)
+        except:
+            pass
     
     fig.canvas.draw()
     

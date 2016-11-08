@@ -16,6 +16,7 @@ digraph modules {
     label = "emt.algo";
     
     "emt.algo.local_max" [label="local_max"];
+    "emt.algo.distortion" [label="distortion"];
     
     }
     
@@ -37,6 +38,7 @@ digraph modules {
     "emt.io.emd" -> "emt.io.ser";
     
     "emt.algo.local_max" -> "emt.eva.ring_diff";
+    "emt.algo.distortion" -> "emt.eva.ring_diff";
     "emt.io.emd" -> "emt.eva.ring_diff";
     
     "emt.io.ser" -> "emt.cmdline_tools.ser2emd";

@@ -3,7 +3,9 @@ Module to process ring diffraction patterns.
 '''
 
 import emt.algo.local_max
+import emt.algo.distortion
 import emt.io.emd
+import matplotlib.pyplot as plt
 
 def run_SingleImage(img, dims, verbose=False):
     '''
@@ -15,7 +17,14 @@ def run_SingleImage(img, dims, verbose=False):
     
     points = emt.algo.local_max.local_max(img, 10, 600)
     
-    plot = emt.algo.local_max.plot_points(img, points, vminmax=(0,0.2))
+    plot = emt.algo.local_max.plot_points(img, points, vminmax=(0,0.2), show=True)
+    
+    points = emt.algo.distortion.filter_ring(points, (984,1032), (700,900))
+    
+    plot = emt.algo.local_max.plot_points(img, points, vminmax=(0,0.2), show=True)
+    
+    # wait for the plot windows
+    plt.show()
     
     return None
     
