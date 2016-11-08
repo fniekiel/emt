@@ -14,14 +14,22 @@ def run_SingleImage(img, dims, verbose=False):
     input:
     return:
     '''
+    pex = {'r':10, 'thresh':600}
+    pfil = {'cinit': (984, 1032), 'rang': (6.0e9, 8.0e9)}
+    pl = {'vminmax': (0,0.2)}
     
-    points = emt.algo.local_max.local_max(img, 10, 600)
     
-    plot = emt.algo.local_max.plot_points(img, points, vminmax=(0,0.2), show=True)
+    points = emt.algo.local_max.local_max(img, pex['r'], pex['thresh'])
     
-    points = emt.algo.distortion.filter_ring(points, (984,1032), (700,900))
+    plot = emt.algo.local_max.plot_points(img, points, pl['vminmax'], invert=True, show=True)
     
-    plot = emt.algo.local_max.plot_points(img, points, vminmax=(0,0.2), show=True)
+    points = emt.algo.distortion.points_todim(points, dims)
+    
+    cinit = emt.algo.distortion.points_todim(pfil['cinit'], dims)
+    
+    points = emt.algo.distortion.filter_ring(points, cinit, pfil['rang'])
+    
+    plot = emt.algo.local_max.plot_points(img, points, pl['vminmax'], dims=dims, invert=True, show=True)
     
     # wait for the plot windows
     plt.show()
@@ -59,6 +67,6 @@ def evaEMDFile(emdfile, verbose=False):
                 
         # evaluate image
         for i in range(data.shape[2]):
-            res = run_SingleImage(data[:,:,i], dims[0:1], verbose=verbose)
+            res = run_SingleImage(data[:,:,i], dims[0:2], verbose=verbose)
     
     return None

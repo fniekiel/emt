@@ -49,7 +49,7 @@ def local_max(img, r, thresh):
     return points
     
     
-def plot_points(img, points, vminmax=(0,1), show=False):
+def plot_points(img, points, vminmax=(0,1), dims=None, invert=False, show=False):
     '''
     Plot the detected points on the input image for checking.
     
@@ -62,10 +62,30 @@ def plot_points(img, points, vminmax=(0,1), show=False):
     plot        plot image as np.ndarray
     '''
     
+    try:
+        assert(isinstance(img, np.ndarray))
+        
+        assert(isinstance(points, np.ndarray))
+        assert(points.shape[1] == 2)
+        assert(len(points.shape) == 2)
+    except:
+        raise RuntimeError('Something wrong with the input!')
+    
     fig = plt.figure()
     ax = fig.add_subplot(111)
     
-    ax.imshow(img.transpose(), cmap="Greys", vmin=np.min(img)+vminmax[0]*(np.max(img)-np.min(img)), vmax=np.min(img)+vminmax[1]*(np.max(img)-np.min(img)))
+    if invert:
+        cmap="Greys"
+    else:
+        cmap="gray"
+    
+    if dims:
+        ax.imshow(img.transpose(), cmap=cmap, vmin=np.min(img)+vminmax[0]*(np.max(img)-np.min(img)), vmax=np.min(img)+vminmax[1]*(np.max(img)-np.min(img)), extent=(np.min(dims[0][0]), np.max(dims[0][0]), np.max(dims[1][0]), np.min(dims[1][0])) )
+        ax.set_xlabel('{} {}'.format(dims[0][1].decode('utf-8'), dims[0][2].decode('utf-8')))
+        ax.set_ylabel('{} {}'.format(dims[1][1].decode('utf-8'), dims[1][2].decode('utf-8')))
+    else:
+        ax.imshow(img.transpose(), cmap=cmap, vmin=np.min(img)+vminmax[0]*(np.max(img)-np.min(img)), vmax=np.min(img)+vminmax[1]*(np.max(img)-np.min(img)) )
+    
     ax.scatter(points[:,1], points[:,0], color='r', marker='o', facecolors='none')
     
     if show:
