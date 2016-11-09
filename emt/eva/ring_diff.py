@@ -4,6 +4,7 @@ Module to process ring diffraction patterns.
 
 import emt.algo.local_max
 import emt.algo.distortion
+import emt.algo.radial_profile
 import emt.io.emd
 import matplotlib.pyplot as plt
 import numpy as np
