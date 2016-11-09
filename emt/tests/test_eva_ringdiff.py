@@ -258,9 +258,52 @@ class test_ringdiff(unittest.TestCase):
             nors, nothes = emt.algo.radial_profile.calc_polarcoords( center, dims, ns, dists[0:5] )
 
         # working
-        rs, thes = emt.algo.radial_profile.calc_polarcoords( center, dims )
+        rs_nodist, thes_nodist = emt.algo.radial_profile.calc_polarcoords( center, dims )
         rs, thes = emt.algo.radial_profile.calc_polarcoords( center, dims, ns, dists )
 
+
+        ## calc_radialprofile
+        rMax = np.abs(dims[0][0][0]-dims[0][0][1])*np.min(img.shape)/2.0
+        dr = np.abs(dims[0][0][0]-dims[0][0][1])/10.
+        rsigma = np.abs(dims[0][0][0]-dims[0][0][1])
+        # wrong input
+        with self.assertRaises(TypeError):
+            noR, noI = emt.algo.radial_profile.calc_radialprofile( 42, rs, rMax, dr, rsigma )
+        with self.assertRaises(TypeError):
+            noR, noI = emt.algo.radial_profile.calc_radialprofile( img, 42, rMax, dr, rsigma )
+        with self.assertRaises(TypeError):
+            noR, noI = emt.algo.radial_profile.calc_radialprofile( img, rs[0:25,0:25], rMax, dr, rsigma )
+        with self.assertRaises(TypeError):
+            noR, noI = emt.algo.radial_profile.calc_radialprofile( img, rs, 'one', dr, rsigma )
+        with self.assertRaises(TypeError):
+            noR, noI = emt.algo.radial_profile.calc_radialprofile( img, rs, rMax, 'two', rsigma )
+        with self.assertRaises(TypeError):
+            noR, noI = emt.algo.radial_profile.calc_radialprofile( img, rs, rMax, dr, 'three' )
+        with self.assertRaises(TypeError):
+            noR, noI = emt.algo.radial_profile.calc_radialprofile( img, rs, rMax, dr, rsigma, mask=42 )
+        with self.assertRaises(TypeError):
+            noR, noI = emt.algo.radial_profile.calc_radialprofile( img, rs, rMax, dr, rsigma, mask=np.ones((25,25)) )
+                                                
+        # working
+        R, I = emt.algo.radial_profile.calc_radialprofile( img, rs, rMax, dr, rsigma )
+        
+        # everything masked
+        emR, emI = emt.algo.radial_profile.calc_radialprofile( img, rs, rMax, dr, rsigma, mask=np.zeros(img.shape) )
+
+
+        ## plot_radialprofile
+        # wrong input
+        
+        # working
+        plot = emt.algo.radial_profile.plot_radialprofile( R, I, dims, show=show) 
+        plot = emt.algo.radial_profile.plot_radialprofile( emR, emI, dims, show=show)
+        
+        
+        ## compare without distortion correction
+        R_nodist, I_nodist = emt.algo.radial_profile.calc_radialprofile( img, rs_nodist, rMax, dr, rsigma )
+        plot = emt.algo.radial_profile.plot_radialprofile( R_nodist, I_nodist, dims, show=show)
+
+        #import pdb;pdb.set_trace()
         
         # wait for plots
         if show:
