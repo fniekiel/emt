@@ -21,6 +21,7 @@ class test_ringdiff(unittest.TestCase):
         Test the local_maxima algorithm to be used for ring diffraction patterns.
         '''
         
+        plt.close('all')        
         show=False
         
         # get an image
@@ -84,6 +85,7 @@ class test_ringdiff(unittest.TestCase):
         Test the distortion fitting algorithms to be used on ring diffraction patterns.
         '''
         
+        plt.close('all')
         show=False
         
         # get an image
@@ -207,6 +209,62 @@ class test_ringdiff(unittest.TestCase):
         # wait for plots
         if show:
             plt.show()
+    
+    
+    def test_radialprofile(self):
+        '''
+        Test the radial_profile algorithms to be used on ring diffraction patterns.
+        '''
+        
+        plt.close('all')        
+        show=True
+        
+        # get an image
+        femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
+        data, dims = femd.get_emdgroup(femd.list_emds[0])
+        
+        img = data[:,:,0]
+        dims = dims[0:2]
+        
+        # points on a ring
+        points = emt.algo.local_max.local_max(img, 10, 600)
+        points = emt.algo.local_max.points_todim(points, dims)
+        center_init = emt.algo.local_max.points_todim((984,1032), dims)
+        points = emt.algo.distortion.filter_ring(points, center_init, (6e9, 8e9))
+        
+        # optimize center
+        center = emt.algo.distortion.optimize_center(points, center_init, verbose=True)
+        
+        # fit distortions
+        ns = (2,3,4)
+        points_plr = emt.algo.distortion.points_topolar(points, center)
+        dists = emt.algo.distortion.optimize_distortion(points_plr, ns)
+        
+        # check input
+        plot = emt.algo.distortion.plot_distpolar(points_plr, dims, dists, ns, show=show)
+        
+        
+        ## calc_polarcoords
+        # wrong input
+        with self.assertRaises(TypeError):
+            nors, nothes = emt.algo.radial_profile.calc_polarcoords( (1,2,3,4,5) )
+        with self.assertRaises(TypeError):
+            nors, nothes = emt.algo.radial_profile.calc_polarcoords( center, dims[0] )
+        with self.assertRaises(TypeError):
+            nors, nothes = emt.algo.radial_profile.calc_polarcoords( center, dims, ns )            
+        with self.assertRaises(TypeError):
+            nors, nothes = emt.algo.radial_profile.calc_polarcoords( center, dims, 42, dists )                    
+        with self.assertRaises(TypeError):
+            nors, nothes = emt.algo.radial_profile.calc_polarcoords( center, dims, ns, dists[0:5] )
+
+        # working
+        rs, thes = emt.algo.radial_profile.calc_polarcoords( center, dims )
+        rs, thes = emt.algo.radial_profile.calc_polarcoords( center, dims, ns, dists )
+
+        
+        # wait for plots
+        if show:
+            plt.show()            
     
     
     def test_eva(self):

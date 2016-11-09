@@ -38,6 +38,8 @@ digraph modules {
     
     "emt.io.emd" -> "emt.io.ser";
     
+    "emt.algo.distortion" -> "emt.algo.radial_profile";
+    
     "emt.algo.local_max" -> "emt.eva.ring_diff";
     "emt.algo.distortion" -> "emt.eva.ring_diff";
     "emt.algo.radial_profile" -> "emt.eva.ring_diff";
