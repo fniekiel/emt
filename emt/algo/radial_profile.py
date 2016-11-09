@@ -6,6 +6,7 @@ import numpy as np
 import scipy.ndimage.filters
 import matplotlib.pyplot as plt
 
+import emt.algo.math
 import emt.algo.distortion
 
 def calc_polarcoords ( center, dims, ns=None, dists=None ):
@@ -155,6 +156,124 @@ def plot_radialprofile( r, intens, dims, show=False ):
     ax = fig.add_subplot(111)
     
     ax.plot(r, intens, 'r-')
+    
+    # labels
+    ax.set_xlabel('r /{}'.format(dims[0][2].decode('utf-8')))
+    ax.set_ylabel('I /[a.u.]')
+        
+    if show:
+        plt.show(block=False)
+    
+    # render to array
+    fig.canvas.draw()
+    plot = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+    plot = plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    
+    return plot
+
+
+def residuals_fit( param, r, intens, funcs ):
+    '''
+    Residual function to fit radial profile with flexibility.
+    
+    The arguments for the single functions are automatically cut from the fit parameters.
+    
+    input:
+    - param         fit parameters
+    - r             r-axis
+    - intens        intensity-axis
+    - funcs         list of functions to include with entrys (function_handle, number_of_arguments)
+    
+    return:
+    - residuals
+    '''
+
+    return intens - emt.algo.math.sum_functions(r, funcs, param)
+    
+    
+def fit_radialprofile( r, intens, funcs, init_guess, maxfev=1000 ):
+    '''
+    Fit the radial profile.
+    
+    Convenience wrapper for fitting.
+    
+    input:
+    - r             r-axis of radial profile
+    - intens        intensity-axis of radial profile
+    - funcs         list of functions with entrys (function_handle, number_of_arguments)
+    - init_guess    initial guess for parameters of functions in funcs
+    '''    
+    
+    try:
+        # check data
+        assert(isinstance(r, np.ndarray))
+        assert(isinstance(intens, np.ndarray))
+        assert(np.array_equal(r.shape, intens.shape))
+        
+        # funcs and params
+        assert(len(funcs)>=1)
+        init_guess = np.array(init_guess)
+        init_guess = np.reshape(init_guess, sum(map(lambda x: x[1], funcs)))
+
+    except:
+        raise TypeError('Something wrong with the input!')
+    
+ 
+    popt, flag = scipy.optimize.leastsq( residuals_fit, init_guess, args=(r, intens, funcs), maxfev=maxfev)
+
+    if flag not in [1,2,3,4]:
+        print('WARNING: fitting of radial profile failed.')
+
+    return popt
+
+
+def plot_fit( r, intens, dims, funcs, param, show=False ):
+    '''
+    Plot the fit results to the radial profile.
+    
+    input:
+    - r             r-axis of radial profile
+    - intens        intensity-axis of radial profile
+    - dims          dimensions of original image to read out units
+    - funcs         list of functions with entrys (function_handle, number_of_arguments)
+    - param         parameters for functions in funcs
+    
+    return:
+    - plot          plot rendered to np.ndarray
+    '''
+    
+    try:
+        # check data
+        assert(isinstance(r, np.ndarray))
+        assert(isinstance(intens, np.ndarray))
+        assert(np.array_equal(r.shape, intens.shape))
+        
+        # check if dims availabel
+        assert(len(dims)>=1)
+        assert(len(dims[0])==3)
+        
+        # funcs and params
+        assert(len(funcs)>=1)
+        param = np.array(param)
+        param = np.reshape(param, sum(map(lambda x: x[1], funcs)))
+
+    except:
+        raise TypeError('Something wrong with the input!')
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    
+    # plot radial profile
+    ax.plot(r, intens, 'r-')
+    
+    # plot single
+    n = 0
+    for i in range(len(funcs)):
+        ax.plot(r, funcs[i][0]( r, param[n:n+funcs[i][1]]), 'g-' )
+        n += funcs[i][1]
+    # sum of functions
+    sum_funcs = emt.algo.math.sum_functions( r, funcs, param )
+    ax.plot(r, sum_funcs, 'b-')
     
     # labels
     ax.set_xlabel('r /{}'.format(dims[0][2].decode('utf-8')))

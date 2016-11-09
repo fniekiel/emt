@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 import emt.io.emd
 import emt.algo.local_max
+import emt.algo.math
 import emt.eva.ring_diff
 
 
@@ -217,7 +218,7 @@ class test_ringdiff(unittest.TestCase):
         '''
         
         plt.close('all')        
-        show=True
+        show=False
         
         # get an image
         femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
@@ -293,6 +294,12 @@ class test_ringdiff(unittest.TestCase):
 
         ## plot_radialprofile
         # wrong input
+        with self.assertRaises(TypeError):
+            noplot = emt.algo.radial_profile.plot_radialprofile( 42, I, dims )
+        with self.assertRaises(TypeError):
+            noplot = emt.algo.radial_profile.plot_radialprofile( R, 42, dims )
+        with self.assertRaises(TypeError):
+            noplot = emt.algo.radial_profile.plot_radialprofile( R, I, 'notdims' )
         
         # working
         plot = emt.algo.radial_profile.plot_radialprofile( R, I, dims, show=show) 
@@ -302,6 +309,83 @@ class test_ringdiff(unittest.TestCase):
         ## compare without distortion correction
         R_nodist, I_nodist = emt.algo.radial_profile.calc_radialprofile( img, rs_nodist, rMax, dr, rsigma )
         plot = emt.algo.radial_profile.plot_radialprofile( R_nodist, I_nodist, dims, show=show)
+        
+        
+        # cut radial profile
+        sel = (R>=1.5e9)*(R<=9.5e9)
+        I = I[sel]
+        R = R[sel]
+        
+
+        
+        ## fit_radialprofile
+        funcs = [ (emt.algo.math.const, 1), (emt.algo.math.powlaw, 2), (emt.algo.math.voigt, 4) ]
+        init_guess = (  10,
+                        1.0e12, -1.0,
+                        5e10, 7.3e9, 1.1e7, 2.5e7 )
+        
+        # wrong input
+        with self.assertRaises(TypeError):
+            nores = emt.algo.radial_profile.fit_radialprofile( 42, I, funcs, init_guess )
+        with self.assertRaises(TypeError):
+            nores = emt.algo.radial_profile.fit_radialprofile( R, 42, funcs, init_guess )
+        with self.assertRaises(TypeError):
+            nores = emt.algo.radial_profile.fit_radialprofile( R, I[0:25], funcs, init_guess )
+        with self.assertRaises(TypeError):
+            nores = emt.algo.radial_profile.fit_radialprofile( R, I, funcs, init_guess[0:3] )
+        with self.assertRaises(TypeError):
+            nores = emt.algo.radial_profile.fit_radialprofile( R, I, 42, init_guess )
+        
+        # working
+        res = emt.algo.radial_profile.fit_radialprofile( R, I, funcs, init_guess, maxfev=10000 ) 
+                 
+        
+        ## plot_fit
+        # wrong input
+        with self.assertRaises(TypeError):
+            noplot = emt.algo.radial_profile.plot_fit( 42, I, dims, funcs, res )
+        with self.assertRaises(TypeError):
+            noplot = emt.algo.radial_profile.plot_fit( R, 42, dims, funcs, res )
+        with self.assertRaises(TypeError):
+            noplot = emt.algo.radial_profile.plot_fit( R, I, 'notdims', funcs, res )
+        with self.assertRaises(TypeError):
+            noplot = emt.algo.radial_profile.plot_fit( R, I, dims, funcs, res[0:3] )
+        with self.assertRaises(TypeError):
+            noplot = emt.algo.radial_profile.plot_fit( R, I, dims, 42, res )
+
+        # before fit
+        plot = emt.algo.radial_profile.plot_fit( R, I, dims, funcs, init_guess, show=show )
+        # after fit
+        plot = emt.algo.radial_profile.plot_fit( R, I, dims, funcs, res, show=show )
+        
+        
+        # try two voigts
+        funcs = [ (emt.algo.math.voigt, 4), (emt.algo.math.voigt, 4) ]
+        init_guess = ( 6e10, 7.3e9, 2e7, 2e7, 
+                       8e10, 2.4e9, 1e8, 1e8 )
+        res = emt.algo.radial_profile.fit_radialprofile( R, I, funcs, init_guess, maxfev=10000 )
+        plot = emt.algo.radial_profile.plot_fit( R, I, dims, funcs, res, show=show )
+
+
+        # subtract a power law background fitted to specific points
+        # get some fixpoints
+        fit_xs = [1.3e9, 1.5e9, 9.05e9]
+        fit_xswidth = 0.05e9
+        fit_R = np.array([])
+        fit_I = np.array([])
+        for xpoint in fit_xs:
+            ix = np.where( np.abs(R-xpoint) < fit_xswidth )
+            fit_R = np.append(fit_R, R[ix])
+            fit_I = np.append(fit_I, I[ix])
+            
+        funcs = [ (emt.algo.math.const, 1), (emt.algo.math.powlaw, 2)]
+        init_guess = (1, 1.0e12, -1.0)
+        res = emt.algo.radial_profile.fit_radialprofile( fit_R, fit_I, funcs, init_guess, maxfev=1000 )
+        plot = emt.algo.radial_profile.plot_fit( R, I, dims, funcs, res, show=show )
+        
+        I = I - emt.algo.math.sum_functions(R, funcs, res)
+        
+        plot = emt.algo.radial_profile.plot_radialprofile( R, I, dims, show=show )
 
         #import pdb;pdb.set_trace()
         
