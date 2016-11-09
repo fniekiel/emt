@@ -42,12 +42,16 @@ def local_max(img, r, thresh):
     # get selection of local maxima
     sel = (img==img_dil)*(img-img_ero > thresh)
     
-    # retrieve points
-    points = np.argwhere(sel)
-    points = np.roll(points, 1, axis=1)
-    
-    return points
-    
+    if sel.any():  
+        # retrieve and return points
+        points = np.argwhere(sel)
+        points = np.roll(points, 1, axis=1)
+        
+        return points
+    else:
+        # otherwise return None to avoid having an empty list
+        return None
+        
     
 def plot_points(img, points, vminmax=(0,1), dims=None, invert=False, show=False):
     '''
@@ -69,7 +73,7 @@ def plot_points(img, points, vminmax=(0,1), dims=None, invert=False, show=False)
         assert(points.shape[1] == 2)
         assert(len(points.shape) == 2)
     except:
-        raise RuntimeError('Something wrong with the input!')
+        raise TypeError('Something wrong with the input!')
     
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -83,8 +87,12 @@ def plot_points(img, points, vminmax=(0,1), dims=None, invert=False, show=False)
         ax.imshow(img.transpose(), cmap=cmap, vmin=np.min(img)+vminmax[0]*(np.max(img)-np.min(img)), vmax=np.min(img)+vminmax[1]*(np.max(img)-np.min(img)), extent=(np.min(dims[0][0]), np.max(dims[0][0]), np.max(dims[1][0]), np.min(dims[1][0])) )
         ax.set_xlabel('{} {}'.format(dims[0][1].decode('utf-8'), dims[0][2].decode('utf-8')))
         ax.set_ylabel('{} {}'.format(dims[1][1].decode('utf-8'), dims[1][2].decode('utf-8')))
+        ax.set_xlim((np.min(dims[0][0]), np.max(dims[0][0])))
+        ax.set_ylim((np.max(dims[1][0]), np.min(dims[1][0])))
     else:
         ax.imshow(img.transpose(), cmap=cmap, vmin=np.min(img)+vminmax[0]*(np.max(img)-np.min(img)), vmax=np.min(img)+vminmax[1]*(np.max(img)-np.min(img)) )
+        ax.set_xlim((0,img.shape[1]-1))
+        ax.set_ylim((img.shape[0]-1,0))
     
     ax.scatter(points[:,1], points[:,0], color='r', marker='o', facecolors='none')
     
@@ -101,3 +109,24 @@ def plot_points(img, points, vminmax=(0,1), dims=None, invert=False, show=False)
     
     return plot
     
+    
+def points_todim(points, dims):
+    '''
+    Convert points from px coordinates to real dim.
+    
+    Points are expected to be array indices for the first two dimensions in dims.
+    '''
+    
+    try:
+        # try to convert input to np.ndarray with 2 columns (necessary if only one entry provided)
+        points = np.reshape(np.array(points), (-1,2))
+        # check if enough dims availabel
+        assert(len(dims)>=2)
+        assert(len(dims[0])==3)
+    except:
+        raise TypeError('Something wrong with the input!')
+    
+    # do the conversion by looking up thing in dimension vectors
+    points_d = np.array( [ dims[0][0][points[:,0]], dims[1][0][points[:,1]] ] ).transpose()
+    
+    return points_d

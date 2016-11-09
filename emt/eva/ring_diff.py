@@ -15,46 +15,9 @@ def run_SingleImage(img, dims, verbose=False):
     input:
     return:
     '''
-    pex = {'r':10, 'thresh':600}
-    pfil = {'cinit': (984, 1032), 'rang': (6.0e9, 8.0e9)}
-    pl = {'vminmax': (0,0.2)}
     
-    
-    points = emt.algo.local_max.local_max(img, pex['r'], pex['thresh'])
-    
-    #plot = emt.algo.local_max.plot_points(img, points, pl['vminmax'], invert=True, show=True)
-    
-    points = emt.algo.distortion.points_todim(points, dims)
-    
-    cinit = emt.algo.distortion.points_todim(pfil['cinit'], dims)
-    
-    points = emt.algo.distortion.filter_ring(points, cinit, pfil['rang'])
-    
-    #plot = emt.algo.local_max.plot_points(img, points, pl['vminmax'], dims=dims, invert=True, show=True)
-    
-    points_plr = emt.algo.distortion.points_topolar(points, cinit)
-    
-    #plot = emt.algo.distortion.plot_ringpolar(points_plr, dims, show=True)
-    
-    center = emt.algo.distortion.optimize_center(points, cinit)
-    if verbose:
-        print('optimized center: ({}, {})'.format(center[0]*1e-9, center[1]*1e-9))
-    
-    points_plr = emt.algo.distortion.points_topolar(points, center)
-    
-    plot = emt.algo.distortion.plot_ringpolar(points_plr, dims, show=True)
-    
-    for ns in ( (2,), (2,3), (2,3,4), (2,3,4,5) ):
-     
-        dists = emt.algo.distortion.optimize_distortion(points_plr, ns, verbose=True)
-    
-        emt.algo.distortion.plot_distpolar(points_plr, dims, dists, ns, show=True)
-   
-    
-    #import pdb; pdb.set_trace()
-
     # wait for the plot windows
-    plt.show()
+    #plt.show()
     
     return None
     

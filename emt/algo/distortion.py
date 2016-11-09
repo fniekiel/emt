@@ -17,7 +17,7 @@ def filter_ring(points, center, rminmax):
     - rminmax       tuple of min and max radial distance
     
     return:
-    - points_f      list of filtered points
+    - points        list of filtered points
     '''
     
     try:
@@ -31,36 +31,18 @@ def filter_ring(points, center, rminmax):
         center = np.reshape(center, 2)
    
     except:
-        raise RuntimeError('Something wrong with the input!')
+        raise TypeError('Something wrong with the input!')
     
     # calculate radii
     rs = np.sqrt( np.square(points[:,0]-center[0]) + np.square(points[:,1]-center[1]) )
     
     # filter by given limits
-    points_f = points[(rs>rminmax[0])*(rs<rminmax[1])]
+    sel = (rs>=rminmax[0])*(rs<=rminmax[1])
     
-    return points_f
-    
-    
-def points_todim(points, dims):
-    '''
-    Convert points from px coordinates to read dim.
-    
-    Points are expected to be array indices for the first two dimensions in dims.
-    '''
-    
-    try:
-        # try to convert input to np.ndarray with 2 columns (necessary if only one entry provided)
-        points = np.reshape(np.array(points), (-1,2))
-        # check if enough dims availabel
-        assert(len(dims)>=2)
-    except:
-        raise RuntimeError('Something wrong with the input!')
-    
-    # do the conversion by looking up thing in dimension vectors
-    points_d = np.array( [ dims[0][0][points[:,0]], dims[1][0][points[:,1]] ] ).transpose()
-    
-    return points_d
+    if sel.any():
+        return points[sel]
+    else:
+        return None
     
     
 def points_topolar(points, center):
@@ -68,6 +50,13 @@ def points_topolar(points, center):
     Convert points to polar coordinate system.
     
     Can be either in pixel or real dim, but should be the same for points and center.
+    
+    input:
+    - points        positions as two column array
+    - center        origin of the polar coordinate system
+    
+    return:
+    - points        positions in polar coordinate system as two column array (r, theta)
     '''
     
     try:
@@ -81,24 +70,44 @@ def points_topolar(points, center):
         center = np.reshape(center, 2)
    
     except:
-        raise RuntimeError('Something wrong with the input!')
+        raise TypeError('Something wrong with the input!')
     
     # calculate radii
     rs = np.sqrt( np.square(points[:,0]-center[0]) + np.square(points[:,1]-center[1]) )
     # calculate angle
     thes = np.arctan2(points[:,1]-center[1], points[:,0]-center[0])
     
-    points_p = np.array( [rs, thes] ).transpose()
-    
-    return points_p
+    return np.array( [rs, thes] ).transpose()
     
     
-def plot_ringpolar(points, dims, show=False): 
+def plot_ringpolar(points, dims, show=False):
+    '''
+    Plot points in polar coordinate system.
+    
+    input:
+    - points        positions in polar coords
+    - dims          dimension information to plot labels
+    '''
 
+    try:
+        # try to convert input to np.ndarray with 2 columns (necessary if only one entry provided)
+        points = np.reshape(np.array(points), (-1,2))
+        # check if enough dims availabel
+        assert(len(dims)>=2)
+        assert(len(dims[0])==3)
+    except:
+        raise TypeError('Something wrong with the input!')
+        
     fig = plt.figure()
     ax = fig.add_subplot(111)
+    
+    # mean value as line
     ax.axhline(np.mean(points[:,0]), ls='--', c='k')
+    
+    # points
     ax.plot(points[:,1], points[:,0], 'rx')
+    
+    # labels
     ax.set_xlabel('theta /[rad]')
     ax.set_xlim( (-np.pi, np.pi) )
     ax.set_ylabel('r /{}'.format(dims[0][2].decode('utf-8')))
@@ -106,6 +115,7 @@ def plot_ringpolar(points, dims, show=False):
     if show:
         plt.show(block=False)
     
+    # render to array
     fig.canvas.draw()
     plot = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
     plot = plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
@@ -128,7 +138,7 @@ def residuals_center( param, data):
     return (rs-np.mean(rs))
     
     
-def optimize_center(points, center, maxfev=1000):
+def optimize_center(points, center, maxfev=1000, verbose=None):
     '''
     Optimize the center by minimizing the sum of square deviations from the mean radial distance.
     
@@ -152,13 +162,16 @@ def optimize_center(points, center, maxfev=1000):
         center = np.reshape(center, 2)
    
     except:
-        raise RuntimeError('Something wrong with the input!')
+        raise TypeError('Something wrong with the input!')
 
     # run the optimization
     popt, flag = scipy.optimize.leastsq( residuals_center, center, args=(points), maxfev=maxfev)
     
     if flag not in [1,2,3,4]:
         print('WARNING: center optimization failed.')
+
+    if verbose:
+        print('optimized center: ({}, {})'.format(center[0], center[1]))
 
     return popt
     
@@ -168,6 +181,12 @@ def rad_dis( theta, alpha, beta, order=2 ):
     Radial distortion due to ellipticity or higher order distortion.
     
     Relative distortion, to be multiplied with radial distance.
+    
+    input:
+    - theta     angles at which to evaluate
+    - alpha     orientation of major axis
+    - beta      strength of distortion (beta = (1-r_min/r_max)/(1+r_min/r_max)
+    - order     order of distortion
     '''
     
     return (1.-np.square(beta))/np.sqrt(1.+np.square(beta)-2.*beta*np.cos(order*(theta+alpha)))
@@ -207,6 +226,19 @@ def optimize_distortion(points, ns, maxfev=1000, verbose=False):
     return:
     - popt          optimized parameters according to ns
     '''
+    
+    try:
+        assert(isinstance(points, np.ndarray))
+        assert(points.shape[1] == 2)
+        # check points to be sufficient for fitting
+        assert(points.shape[0] >= 3)
+        
+        # check orders
+        assert(len(ns)>=1)
+    except:
+        raise TypeError('Something wrong with the input!')
+        
+    
     
     # init guess for full fit
     init_guess = np.ones(len(ns)*2+1)
@@ -266,6 +298,23 @@ def plot_distpolar(points, dims, dists, ns, show=False):
     - ns            list of used orders
     '''
     
+    try:
+        # check points
+        assert(isinstance(points, np.ndarray))
+        assert(points.shape[1] == 2)
+        
+        # check if enough dims availabel
+        assert(len(dims)>=2)
+        assert(len(dims[0])==3)
+        
+        # check orders
+        assert(len(ns)>=1)
+        
+        # check dists
+        assert(dists.shape[0] == len(ns)*2+1)
+    except:
+        raise TypeError('Something wrong with the input!')
+    
     fig = plt.figure()
     ax = fig.add_subplot(111)
     
@@ -304,16 +353,3 @@ def plot_distpolar(points, dims, dists, ns, show=False):
     plot = plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     
     return plot
-
-
-
-
-
-
-
-
-
-
-
-
-    
