@@ -5,6 +5,7 @@ Tests for the evaluation of ring diffraction patterns.
 import unittest
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 import emt.io.emd
 import emt.algo.local_max
@@ -398,15 +399,105 @@ class test_ringdiff(unittest.TestCase):
         plt.close('all')        
         show=True
         
+        
+        ### test settings writing and reading
+        if os.path.isfile('resources/output/test_settings.emd'):
+            os.remove('resources/output/test_settings.emd')
+            
+        femd = emt.io.emd.fileEMD('resources/output/test_settings.emd')
+        
+        
+        ## minimum settings necessary, with many nones
+        settings_minimum = { 'lmax_r': 10,
+                 'lmax_thresh': 600,
+                 'lmax_cinit': (984, 1032),
+                 'lmax_range': (6e9, 8e9),
+                 'plt_imgminmax': (0.0, 0.2),
+                 'ns': (2,3,4),
+                 'rad_rmax': None,
+                 'rad_dr': None,
+                 'rad_sigma': None,
+                 'mask': None,
+                 'fit_rrange': (1.5e9, 9.5e9),
+                 'fit_funcs': ('const', 'powlaw', 'voigt'),
+                 'fit_init': ( 10,
+                               1.0e12, -1.0,
+                               5e10, 7.3e9, 1.1e7, 2.5e7 ),
+                 'fit_maxfev': None
+               }
+        
+        # put       
+        par = femd.file_hdl.create_group('put_minimum')
+        emt.eva.ring_diff.put_settings( par, settings_minimum )
+        
+        # get
+        in_settings_minimum = emt.eva.ring_diff.get_settings( par['settings_ringdiffraction'] )
+        
+        # compare the two settings
+        for key in settings_minimum:
+            self.assertTrue(key in in_settings_minimum)
+            
+            comp = (settings_minimum[key]==in_settings_minimum[key])
+            if isinstance(comp, bool):
+                self.assertTrue(comp)
+            else:
+                self.assertTrue(comp.all())
+        
+        
+        ## full settings with all parameters set
+        settings_full = { 'lmax_r': 10,
+                 'lmax_thresh': 600,
+                 'lmax_cinit': (984, 1032),
+                 'lmax_range': (6e9, 8e9),
+                 'plt_imgminmax': (0.0, 0.2),
+                 'ns': (2,3,4),
+                 'rad_rmax': 42.,
+                 'rad_dr': 0.1,
+                 'rad_sigma': 0.01,
+                 'mask': np.ones((25,25)),
+                 'fit_rrange': (1.5e9, 9.5e9),
+                 'fit_funcs': ('const', 'powlaw', 'voigt'),
+                 'fit_init': ( 10,
+                               1.0e12, -1.0,
+                               5e10, 7.3e9, 1.1e7, 2.5e7 ),
+                 'fit_maxfev': 1000
+               }
+               
+        # put       
+        par = femd.file_hdl.create_group('put_full')
+        emt.eva.ring_diff.put_settings( par, settings_full )
+        
+        # get
+        in_settings_full = emt.eva.ring_diff.get_settings( par['settings_ringdiffraction'] )
+        
+        # compare the two settings
+        for key in settings_full:
+            self.assertTrue(key in in_settings_full)
+            
+            comp = (settings_full[key]==in_settings_full[key])
+            if isinstance(comp, bool):
+                self.assertTrue(comp)
+            else:
+                self.assertTrue(comp.all())
+        
+        
+        
+        
+        #import pdb;pdb.set_trace()
+        
         # wrong file
-        with self.assertRaises(RuntimeError):
-            with open('resources/output/test.txt', 'w') as f:
-                emt.eva.ring_diff.evaEMDFile(f)
+        #with self.assertRaises(RuntimeError):
+        #    with open('resources/output/test.txt', 'w') as f:
+        #        emt.eva.ring_diff.evaEMDFile(f)
                         
         # right file
         femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
         
-        emt.eva.ring_diff.evaEMDFile(femd, verbose=True)
+        if os.path.isfile('resources/output/evaluation.emd'):
+            os.remove('resources/output/evaluation.emd')
+        femd_out = emt.io.emd.fileEMD('resources/output/evaluation.emd')
+        
+        #emt.eva.ring_diff.evaEMDFile(femd, femd_out, verbose=True)
         
         
         # wait for plots
