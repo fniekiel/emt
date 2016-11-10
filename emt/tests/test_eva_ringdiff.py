@@ -218,7 +218,7 @@ class test_ringdiff(unittest.TestCase):
         '''
         
         plt.close('all')        
-        show=True
+        show=False
         
         # get an image
         femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
@@ -317,7 +317,6 @@ class test_ringdiff(unittest.TestCase):
         R = R[sel]
         
 
-        
         ## fit_radialprofile
         funcs = [ 'const', 'powlaw', 'voigt' ]
         init_guess = (  10,
@@ -396,6 +395,9 @@ class test_ringdiff(unittest.TestCase):
     
     def test_eva(self):
         
+        plt.close('all')        
+        show=True
+        
         # wrong file
         with self.assertRaises(RuntimeError):
             with open('resources/output/test.txt', 'w') as f:
@@ -407,7 +409,9 @@ class test_ringdiff(unittest.TestCase):
         emt.eva.ring_diff.evaEMDFile(femd, verbose=True)
         
         
-        
+        # wait for plots
+        if show:
+            plt.show()     
         
 
 # to test with unittest runner

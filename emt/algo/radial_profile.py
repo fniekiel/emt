@@ -2,6 +2,7 @@
 Module to calculate radial profiles.
 '''
 
+import copy
 import numpy as np
 import scipy.ndimage.filters
 import matplotlib.pyplot as plt
@@ -191,7 +192,7 @@ def residuals_fit( param, r, intens, funcs ):
     return intens - emt.algo.math.sum_functions(r, funcs, param)
     
     
-def fit_radialprofile( r, intens, funcs, init_guess, maxfev=1000 ):
+def fit_radialprofile( r, intens, funcs, init_guess, maxfev=None ):
     '''
     Fit the radial profile.
     
@@ -221,6 +222,8 @@ def fit_radialprofile( r, intens, funcs, init_guess, maxfev=1000 ):
     except:
         raise TypeError('Something wrong with the input!')
     
+    if maxfev is None:
+        maxfev = 1000
  
     popt, flag = scipy.optimize.leastsq( residuals_fit, init_guess, args=(r, intens, funcs), maxfev=maxfev)
 
@@ -294,3 +297,87 @@ def plot_fit( r, intens, dims, funcs, param, show=False ):
     plot = plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     
     return plot
+    
+    
+def run_singleImage( img, dims, settings, show=False ):
+    '''
+    Evaluate a single ring diffraction pattern with given settings.
+    
+    input:
+    - img           image as np.ndarray
+    - dims          corresponding dim vectors
+    - settings      dict of settings necessary for the evaluation
+        - lmax_r        (int)               radius used for local maximum detection                 [px]
+        - lmax_thresh   (int)               threshold for local maximum detection                   [intensity]
+        - lmax_cinit    (int, int)          initial guess for center                                [px]
+        - lmax_range    (float, float)      r range to cinit used to filter local maxima            [dims]
+        - ns            (int, ...)          distortion orders to correct                            []
+        - fit_rrange    (float, float)      r range used to fit radial profile                      [dims]
+        - fit_funcs     (str, ...)          list of functions to model radial profile               []
+
+        optional (set to None to use defaults)
+        - plt_imgminmax (float, float)      relative range to plot the img                          []
+        - rad_rmax      (float)             max r to be used in radial profile                      [dims]
+        - rad_dr        (float)             stepsize for r-axis in radial profile                   [dims]
+        - rad_sigma     (float)             sigma for Gaussian used as kernel density estimator     [dims]
+        - mask          (np.ndarray)        binary image as img, 0 for pixels to exclude            []
+        - fit_maxfev    (int)               maxfev forwarded to scipy optimize                      []
+        
+    return:
+    - res
+    '''
+    
+    # create a copy of settings to decouple
+    mysettings = copy.deepcopy(settings)
+    
+    # get local maxima an turn them into real space coords
+    points = emt.algo.local_max.local_max(img, mysettings['lmax_r'], mysettings['lmax_thresh'])
+    points = emt.algo.local_max.points_todim(points, dims)
+    
+    # convert center to real space
+    center_init = emt.algo.local_max.points_todim(mysettings['lmax_cinit'], dims)
+    
+    # filter to single ring
+    points = emt.algo.distortion.filter_ring(points, center_init, mysettings['lmax_range'])
+    
+    if show:
+        if settings['plt_imgminmax'] is None:
+            mysettings['plt_imgminmax'] = (0.,1.)
+            
+        plot = emt.algo.local_max.plot_points(img, points, vminmax=mysettings['plt_imgminmax'], dims=dims, invert=True, show=show)
+    
+    # optimize center
+    center = emt.algo.distortion.optimize_center(points, center_init, verbose=show)
+        
+    # fit distortions
+    points_plr = emt.algo.distortion.points_topolar(points, center)
+    dists = emt.algo.distortion.optimize_distortion(points_plr, mysettings['ns'])
+    if show:
+        plot = emt.algo.distortion.plot_distpolar(points_plr, dims, dists, mysettings['ns'], show=show)
+    
+    # calc coordinates in optimized system
+    rs, thes = emt.algo.radial_profile.calc_polarcoords( center, dims, mysettings['ns'], dists )
+    
+    if settings['rad_rmax'] is None:
+        mysettings['rad_rmax'] = np.abs(dims[0][0][0]-dims[0][0][1])*np.min(img.shape)/2.0
+    if settings['rad_dr'] is None:
+        mysettings['rad_dr'] = np.abs(dims[0][0][0]-dims[0][0][1])/10.
+    if settings['rad_sigma'] is None:
+        mysettings['rad_sigma'] = np.abs(dims[0][0][0]-dims[0][0][1])
+        
+    # extract radial profile
+    R, I = emt.algo.radial_profile.calc_radialprofile( img, rs, mysettings['rad_rmax'], mysettings['rad_dr'], mysettings['rad_sigma'], mask=mysettings['mask'] )
+    
+    # cut radial profile
+    sel = (R>=mysettings['fit_rrange'][0])*(R<=mysettings['fit_rrange'][1])
+    I = I[sel]
+    R = R[sel]
+    
+    # working
+    res = emt.algo.radial_profile.fit_radialprofile( R, I, mysettings['fit_funcs'], mysettings['fit_init'], maxfev=mysettings['fit_maxfev'])
+    
+    if show:
+        plot = emt.algo.radial_profile.plot_fit( R, I, dims, mysettings['fit_funcs'], res, show=show )
+        
+    return np.array([R,I]).transpose(), res, center, dists, mysettings
+    
