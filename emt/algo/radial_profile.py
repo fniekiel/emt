@@ -182,8 +182,8 @@ def residuals_fit( param, r, intens, funcs ):
     - param         fit parameters
     - r             r-axis
     - intens        intensity-axis
-    - funcs         list of functions to include with entrys (function_handle, number_of_arguments)
-    
+    - funcs         list of functions to include
+        
     return:
     - residuals
     '''
@@ -200,7 +200,7 @@ def fit_radialprofile( r, intens, funcs, init_guess, maxfev=1000 ):
     input:
     - r             r-axis of radial profile
     - intens        intensity-axis of radial profile
-    - funcs         list of functions with entrys (function_handle, number_of_arguments)
+    - funcs         list of functions
     - init_guess    initial guess for parameters of functions in funcs
     '''    
     
@@ -212,8 +212,11 @@ def fit_radialprofile( r, intens, funcs, init_guess, maxfev=1000 ):
         
         # funcs and params
         assert(len(funcs)>=1)
+        for i in range(len(funcs)):
+            assert(funcs[i] in emt.algo.math.lkp_funcs)
+        
         init_guess = np.array(init_guess)
-        init_guess = np.reshape(init_guess, sum(map(lambda x: x[1], funcs)))
+        init_guess = np.reshape(init_guess, sum(map(lambda x: emt.algo.math.lkp_funcs[x][1], funcs)))
 
     except:
         raise TypeError('Something wrong with the input!')
@@ -235,7 +238,7 @@ def plot_fit( r, intens, dims, funcs, param, show=False ):
     - r             r-axis of radial profile
     - intens        intensity-axis of radial profile
     - dims          dimensions of original image to read out units
-    - funcs         list of functions with entrys (function_handle, number_of_arguments)
+    - funcs         list of functions
     - param         parameters for functions in funcs
     
     return:
@@ -254,8 +257,11 @@ def plot_fit( r, intens, dims, funcs, param, show=False ):
         
         # funcs and params
         assert(len(funcs)>=1)
+        for i in range(len(funcs)):
+            assert(funcs[i] in emt.algo.math.lkp_funcs)
+            
         param = np.array(param)
-        param = np.reshape(param, sum(map(lambda x: x[1], funcs)))
+        param = np.reshape(param, sum(map(lambda x: emt.algo.math.lkp_funcs[x][1], funcs)))
 
     except:
         raise TypeError('Something wrong with the input!')
@@ -269,8 +275,8 @@ def plot_fit( r, intens, dims, funcs, param, show=False ):
     # plot single
     n = 0
     for i in range(len(funcs)):
-        ax.plot(r, funcs[i][0]( r, param[n:n+funcs[i][1]]), 'g-' )
-        n += funcs[i][1]
+        ax.plot(r, emt.algo.math.lkp_funcs[funcs[i]][0]( r, param[n:n+emt.algo.math.lkp_funcs[funcs[i]][1]]), 'g-' )
+        n += emt.algo.math.lkp_funcs[funcs[i]][1]
     # sum of functions
     sum_funcs = emt.algo.math.sum_functions( r, funcs, param )
     ax.plot(r, sum_funcs, 'b-')

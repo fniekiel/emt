@@ -218,7 +218,7 @@ class test_ringdiff(unittest.TestCase):
         '''
         
         plt.close('all')        
-        show=False
+        show=True
         
         # get an image
         femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
@@ -319,7 +319,7 @@ class test_ringdiff(unittest.TestCase):
 
         
         ## fit_radialprofile
-        funcs = [ (emt.algo.math.const, 1), (emt.algo.math.powlaw, 2), (emt.algo.math.voigt, 4) ]
+        funcs = [ 'const', 'powlaw', 'voigt' ]
         init_guess = (  10,
                         1.0e12, -1.0,
                         5e10, 7.3e9, 1.1e7, 2.5e7 )
@@ -360,7 +360,7 @@ class test_ringdiff(unittest.TestCase):
         
         
         # try two voigts
-        funcs = [ (emt.algo.math.voigt, 4), (emt.algo.math.voigt, 4) ]
+        funcs = [ 'voigt', 'voigt' ]
         init_guess = ( 6e10, 7.3e9, 2e7, 2e7, 
                        8e10, 2.4e9, 1e8, 1e8 )
         res = emt.algo.radial_profile.fit_radialprofile( R, I, funcs, init_guess, maxfev=10000 )
@@ -378,7 +378,7 @@ class test_ringdiff(unittest.TestCase):
             fit_R = np.append(fit_R, R[ix])
             fit_I = np.append(fit_I, I[ix])
             
-        funcs = [ (emt.algo.math.const, 1), (emt.algo.math.powlaw, 2)]
+        funcs = [ 'const', 'powlaw']
         init_guess = (1, 1.0e12, -1.0)
         res = emt.algo.radial_profile.fit_radialprofile( fit_R, fit_I, funcs, init_guess, maxfev=1000 )
         plot = emt.algo.radial_profile.plot_fit( R, I, dims, funcs, res, show=show )

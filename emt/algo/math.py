@@ -51,7 +51,14 @@ def sum_functions( x, funcs, param ):
     n = 0
     # evaluate given functions
     for i in range(len(funcs)):
-        est += funcs[i][0]( x, param[n:n+funcs[i][1]] )
-        n += funcs[i][1]
+        est += lkp_funcs[funcs[i]][0]( x, param[n:n+lkp_funcs[funcs[i]][1]] )
+        n += lkp_funcs[funcs[i]][1]
         
     return est
+    
+
+# lookup table for functions
+lkp_funcs = { 'const': (const, 1),
+              'powlaw': (powlaw, 2),
+              'voigt': (voigt, 4)
+            }
