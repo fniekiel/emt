@@ -35,6 +35,9 @@ def get_settings( parent ):
     settings['lmax_range'] = parent.attrs['lmax_range']
     settings['ns'] = parent.attrs['ns']
     settings['fit_rrange'] = parent.attrs['fit_rrange']
+    settings['back_xs'] = parent.attrs['back_xs']
+    settings['back_xswidth'] = parent.attrs['back_xswidth']
+    settings['back_init'] = parent.attrs['back_init']
     settings['fit_init'] = parent.attrs['fit_init']
     
     in_funcs = parent.attrs['fit_funcs']
@@ -98,6 +101,9 @@ def put_settings( parent, settings ):
     grp_set.attrs['lmax_range'] = settings['lmax_range']
     grp_set.attrs['ns'] = settings['ns']
     grp_set.attrs['fit_rrange'] = settings['fit_rrange']
+    grp_set.attrs['back_xs'] = settings['back_xs']
+    grp_set.attrs['back_xswidth'] = settings['back_xswidth']
+    grp_set.attrs['back_init'] = settings['back_init']
     grp_set.attrs['fit_init'] = settings['fit_init']
     
     fit_funcs = []
@@ -197,11 +203,13 @@ def run_sglgroup(group, outfile, verbose=False, showplots=False):
     centers = None
     distss = None
     fits = None
+    rawprofiles = None
+    fits_back = None
     
     
     # run evaluation with settings
     for i in range(data.shape[2]):
-        profile, res, center, dists, myset = emt.algo.radial_profile.run_singleImage( data[:,:,i], dims[0:2], settings,  show=showplots)
+        profile, res, center, dists, rawprofile, res_back, myset = emt.algo.radial_profile.run_singleImage( data[:,:,i], dims[0:2], settings,  show=showplots)
     
         # after first run I know the size
         if profiles is None:
@@ -209,12 +217,16 @@ def run_sglgroup(group, outfile, verbose=False, showplots=False):
             fits = np.zeros( (res.shape[0], data.shape[2]) )
             centers = np.zeros( (2, data.shape[2]) )
             distss = np.zeros( (dists.shape[0], data.shape[2]) )
+            rawprofiles = np.zeros( (rawprofile.shape[0], data.shape[2]) )
+            fits_back = np.zeros( (res_back.shape[0], data.shape[2]) )
             
         # assign data    
         profiles[:,i] = profile[:,1]
         fits[:,i] = res[:]
         centers[:,i] = center[:]
         distss[:,i] = dists[:]
+        rawprofiles[:,i] = rawprofile[:,1]
+        fits_back[:,i] = res_back[:]
         
         import pdb;pdb.set_trace()
         
@@ -224,6 +236,8 @@ def run_sglgroup(group, outfile, verbose=False, showplots=False):
     outfile.put_emdgroup('fit_results', fits, ( ( np.array(range(fits.shape[0])), 'parameters', '[]') , dims[2]), group)
     outfile.put_emdgroup('centers', centers, ( ( np.array(range(2)), 'dimension', dims[0][2]) , dims[2]), group)    
     outfile.put_emdgroup('distortions', distss, ( ( np.array(range(distss.shape[0])), 'parameters', '[]') , dims[2]), group)
+    outfile.put_emdgroup('radial_profile_noback', rawprofiles, ( (rawprofile[:,0], 'radial distance', dims[0][2]) , dims[2]), group)
+    outfile.put_emdgroup('back_results', fits_back, ( ( np.array(range(fits_back.shape[0])), 'background parameters', '[]') , dims[2]), group)
     
     outfile.put_comment('Evaluated "{}" using ring diffraction analysis.'.format(group.name))
     
@@ -291,10 +305,11 @@ def evaEMDFile(emdfile, outfile, verbose=False):
                  'rad_sigma': None,
                  'mask': None,
                  'fit_rrange': (1.5e9, 9.5e9),
-                 'fit_funcs': ('const', 'powlaw', 'voigt'),
-                 'fit_init': ( 10,
-                               1.0e12, -1.0,
-                               5e10, 7.3e9, 1.1e7, 2.5e7 ),
+                 'back_xs': (1.3e9, 1.5e9, 9.05e9),
+                 'back_xswidth': 0.05e9,
+                 'back_init': (1, 1.0e12, -1.0),
+                 'fit_funcs': ('voigt',),
+                 'fit_init': ( 5e10, 7.3e9, 1.1e7, 2.5e7 ),
                  'fit_maxfev': None
                }
                    

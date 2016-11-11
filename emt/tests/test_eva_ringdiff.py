@@ -419,10 +419,11 @@ class test_ringdiff(unittest.TestCase):
                  'rad_sigma': None,
                  'mask': None,
                  'fit_rrange': (1.5e9, 9.5e9),
-                 'fit_funcs': ('const', 'powlaw', 'voigt'),
-                 'fit_init': ( 10,
-                               1.0e12, -1.0,
-                               5e10, 7.3e9, 1.1e7, 2.5e7 ),
+                 'back_xs': (1.3e9, 1.5e9, 9.05e9),
+                 'back_xswidth': 0.05e9,
+                 'back_init': (1, 1.0e12, -1.0),
+                 'fit_funcs': ('voigt',),
+                 'fit_init': ( 5e10, 7.3e9, 1.1e7, 2.5e7 ),
                  'fit_maxfev': None
                }
         
@@ -456,10 +457,11 @@ class test_ringdiff(unittest.TestCase):
                  'rad_sigma': 0.01,
                  'mask': np.ones((25,25)),
                  'fit_rrange': (1.5e9, 9.5e9),
-                 'fit_funcs': ('const', 'powlaw', 'voigt'),
-                 'fit_init': ( 10,
-                               1.0e12, -1.0,
-                               5e10, 7.3e9, 1.1e7, 2.5e7 ),
+                 'back_xs': (1.3e9, 1.5e9, 9.05e9),
+                 'back_xswidth': 0.05e9,
+                 'back_init': (1, 1.0e12, -1.0),
+                 'fit_funcs': ('voigt',),
+                 'fit_init': ( 5e10, 7.3e9, 1.1e7, 2.5e7 ),
                  'fit_maxfev': 1000
                }
                
@@ -509,16 +511,17 @@ class test_ringdiff(unittest.TestCase):
                  'rad_sigma': None,
                  'mask': None,
                  'fit_rrange': (1.5e9, 9.5e9),
-                 'fit_funcs': ('const', 'powlaw', 'voigt'),
-                 'fit_init': ( 10,
-                               1.0e12, -1.0,
-                               5e10, 7.3e9, 1.1e7, 2.5e7 ),
+                 'back_xs': (1.3e9, 1.5e9, 9.05e9),
+                 'back_xswidth': 0.05e9,
+                 'back_init': (1, 1.0e12, -1.0),
+                 'fit_funcs': ('voigt',),
+                 'fit_init': ( 5e10, 7.3e9, 1.1e7, 2.5e7 ),
                  'fit_maxfev': None
                }
         emt.eva.ring_diff.put_settings(femd_out.file_hdl, settings)
 
         # run the evaluation
-        emt.eva.ring_diff.run_sglgroup(hdl, femd_out, verbose=True, showplots=False)
+        emt.eva.ring_diff.run_sglgroup(hdl, femd_out, verbose=True, showplots=True)
         
         
         
@@ -538,22 +541,27 @@ class test_ringdiff(unittest.TestCase):
         
         # put the settings
         settings = { 'lmax_r': 16,
-                 'lmax_thresh': 270,
-                 'lmax_cinit': (1012, 1020),
-                 'lmax_range': (5.5e9, 7.5e9),
-                 'plt_imgminmax': (0.,0.4),
-                 'ns': (2,3,4),
-                 'rad_rmax': None,
-                 'rad_dr': None,
-                 'rad_sigma': None,
-                 'mask': None,
-                 'fit_rrange': (1.5e9, 9.5e9),
-                 'fit_funcs': ('const', 'powlaw', 'voigt'),
-                 'fit_init': ( 10,
-                               1.0e12, -1.0,
-                               5e10, 7.3e9, 1.1e7, 2.5e7 ),
-                 'fit_maxfev': None
-               }
+                     'lmax_thresh': 270,
+                     'lmax_cinit': (1012, 1020),
+                     'lmax_range': (6.0e9, 7.5e9),
+                     'plt_imgminmax': (0.,0.4),
+                     'ns': (2,3,4),
+                     'rad_rmax': None,
+                     'rad_dr': None,
+                     'rad_sigma': None,
+                     'mask': None,
+                     'fit_rrange': (1.5e9, 9.5e9),
+                     'back_xs': (1.3e9, 1.5e9, 9.05e9),
+                     'back_xswidth': 0.05e9,
+                     'back_init': (1, 6e8, -7),
+                     'fit_funcs': ('voigt','voigt','voigt','voigt','voigt'),
+                     'fit_init': ( 3.4e10, 4.25e9, 1.1e7, 2.5e7,
+                                   9.1e9, 4.90e9, 1.1e7, 2.5e7,
+                                   1.6e10, 6.95e9, 1.1e7, 2.5e7,
+                                   1.1e10, 8.14e9, 1.1e7, 2.5e7,
+                                   1.6e9, 8.50e9, 1.1e7, 2.5e7 ),
+                     'fit_maxfev': None
+                   }
         emt.eva.ring_diff.put_settings(femd_out.file_hdl, settings)
 
         # run the evaluation

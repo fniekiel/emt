@@ -313,7 +313,11 @@ def run_singleImage( img, dims, settings, show=False ):
         - lmax_range    (float, float)      r range to cinit used to filter local maxima            [dims]
         - ns            (int, ...)          distortion orders to correct                            []
         - fit_rrange    (float, float)      r range used to fit radial profile                      [dims]
+        - back_xs       (float, ...)        fixpoints for subtracting background                    [dims]
+        - back_xswidth  (float)             range around fixpoints to take into account             [dims]
+        - back_init     (float)             initial guess for subtracting background
         - fit_funcs     (str, ...)          list of functions to model radial profile               []
+        - fit_init      (float, ...)        initial guess for fitting                               []
 
         optional (set to None to use defaults)
         - plt_imgminmax (float, float)      relative range to plot the img                          []
@@ -373,11 +377,29 @@ def run_singleImage( img, dims, settings, show=False ):
     I = I[sel]
     R = R[sel]
     
+    rawRI = np.copy(np.array([R,I]).transpose())
+    
+    # subtract a power law background fitted to specific points
+    fit_R = np.array([])
+    fit_I = np.array([])
+    for xpoint in mysettings['back_xs']:
+        ix = np.where( np.abs(R-xpoint) < mysettings['back_xswidth'] )
+        fit_R = np.append(fit_R, R[ix])
+        fit_I = np.append(fit_I, I[ix])
+            
+    funcs_back = [ 'const', 'powlaw']
+    res_back = emt.algo.radial_profile.fit_radialprofile( fit_R, fit_I, funcs_back, mysettings['back_init'], maxfev=1000 )
+    if show:
+        plot = emt.algo.radial_profile.plot_fit( R, I, dims, funcs_back, res_back, show=show )
+        
+    I = I - emt.algo.math.sum_functions(R, funcs_back, res_back)    
+    
+    
     # working
     res = emt.algo.radial_profile.fit_radialprofile( R, I, mysettings['fit_funcs'], mysettings['fit_init'], maxfev=mysettings['fit_maxfev'])
     
     if show:
         plot = emt.algo.radial_profile.plot_fit( R, I, dims, mysettings['fit_funcs'], res, show=show )
         
-    return np.array([R,I]).transpose(), res, center, dists, mysettings
+    return np.array([R,I]).transpose(), res, center, dists, rawRI, res_back, mysettings
     
