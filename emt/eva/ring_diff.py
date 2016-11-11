@@ -7,21 +7,23 @@ import emt.algo.distortion
 import emt.algo.radial_profile
 import emt.algo.math
 import emt.io.emd
+
 import matplotlib.pyplot as plt
 import numpy as np
+import h5py
 
 
 # used to indicate settings format
-cur_vers = 'ring_diffraction_vers0.1'
+cur_set_vers = 'ring_diffraction_setting_vers0.1'
+cur_eva_vers = 'ring_diffraction_evaluation_vers0.1'
 
 
 def get_settings( parent ):
     '''
     Get settings for radial profile evaluation.
-    
     '''
     
-    if not parent.attrs['type'] == np.string_(cur_vers):
+    if not parent.attrs['type'] == np.string_(cur_set_vers):
         print('Don\'t  know the format of these settings.')
         return None
     
@@ -71,7 +73,6 @@ def get_settings( parent ):
     else:
         settings['fit_maxfev'] = None
 
-
     return settings
 
 
@@ -88,7 +89,7 @@ def put_settings( parent, settings ):
         raise RuntimeError('Could not write to {}'.format(parent))
         
     # set version information    
-    grp_set.attrs['type'] = np.string_(cur_vers)
+    grp_set.attrs['type'] = np.string_(cur_set_vers)
     
     # hardcoding the written settings to keep control
     grp_set.attrs['lmax_r'] = settings['lmax_r']
@@ -116,6 +117,147 @@ def put_settings( parent, settings ):
         grp_set.create_dataset('mask', data=settings['mask'])
     if not settings['fit_maxfev'] is None:
         grp_set.attrs['fit_maxfev'] = settings['fit_maxfev']
+        
+    return grp_set
+
+
+def put_sglgroup(parent, label, data_grp):
+    '''
+    Puts the todo evaluation into parent.
+    
+    Remember that the ressource of the external link must not be already opened elsewhere to access data.
+    
+    input:
+    - parent        hdf5 group to add this evaluation group to
+    - label         label for the evaluation group    
+    - data_grp      emdtype group where to find the data
+    '''
+    
+    # create the evaluation group
+    grp = parent.create_group(label)
+    grp.attrs['type'] = np.string_(cur_eva_vers)
+    
+    # put a link to the data
+    grp.attrs['filename'] = np.string_(data_grp.file.filename)
+    grp.attrs['internal_path'] = np.string_(data_grp.name)
+    #grp['emdgroup'] = h5py.ExternalLink(data_grp.file.filename, data_grp.name)    
+    
+    return grp
+    
+
+
+def run_sglgroup(group, outfile, verbose=False, showplots=False):
+    '''
+    Run evaluation on a single group.
+    '''
+
+    try:
+        assert(isinstance(group, h5py._hl.group.Group))
+        assert( group.attrs['type'] == np.string_(cur_eva_vers) )
+    except:
+        raise RuntimeError('Something wrong with the input.')
+        
+    
+    if verbose:
+        print('Running evaluation of "{}".'.format(group.name))
+        
+        
+    # get the emdgroup
+    if verbose:
+        print('.. getting data from {}:{}'.format(group.attrs['filename'].decode('utf-8'), group.attrs['internal_path'].decode('utf-8')))
+    readfile = emt.io.emd.fileEMD( group.attrs['filename'].decode('utf-8'), readonly=True )
+    data, dims = readfile.get_emdgroup(readfile.file_hdl[group.attrs['internal_path'].decode('utf-8')])
+    
+    
+    # find the settings moving upwards in hierarchy
+    if verbose:
+        print('.. searching for settings.')
+    def proc_group(grp):
+        #print('scanning group {}'.format(grp))
+        if 'settings_ringdiffraction' in grp:
+            stt = grp['settings_ringdiffraction']
+            if stt.attrs['type'] == np.string_(cur_set_vers):
+                return stt
+        else:
+            if not grp == grp.file:
+                return proc_group(grp.parent)
+
+    grp_set = proc_group(group)
+    
+    if grp_set is None:
+        raise RuntimeError('Could not find settings in evaluation group or its parents.')
+    else:
+        if verbose:
+            print('.. loading settings from {}.'.format(grp_set.name))
+        settings = get_settings(grp_set)
+    
+    
+    # what data to collect
+    profiles = None
+    centers = None
+    distss = None
+    fits = None
+    
+    
+    # run evaluation with settings
+    for i in range(data.shape[2]):
+        profile, res, center, dists, myset = emt.algo.radial_profile.run_singleImage( data[:,:,i], dims[0:2], settings,  show=showplots)
+    
+        # after first run I know the size
+        if profiles is None:
+            profiles = np.zeros( (profile.shape[0], data.shape[2]) )
+            fits = np.zeros( (res.shape[0], data.shape[2]) )
+            centers = np.zeros( (2, data.shape[2]) )
+            distss = np.zeros( (dists.shape[0], data.shape[2]) )
+            
+        # assign data    
+        profiles[:,i] = profile[:,1]
+        fits[:,i] = res[:]
+        centers[:,i] = center[:]
+        distss[:,i] = dists[:]
+        
+        import pdb;pdb.set_trace()
+        
+        
+    # save results in this group
+    outfile.put_emdgroup('radial_profile', profiles, ( (profile[:,0], 'radial distance', dims[0][2]) , dims[2]), group)
+    outfile.put_emdgroup('fit_results', fits, ( ( np.array(range(fits.shape[0])), 'parameters', '[]') , dims[2]), group)
+    outfile.put_emdgroup('centers', centers, ( ( np.array(range(2)), 'dimension', dims[0][2]) , dims[2]), group)    
+    outfile.put_emdgroup('distortions', distss, ( ( np.array(range(distss.shape[0])), 'parameters', '[]') , dims[2]), group)
+    
+    outfile.put_comment('Evaluated "{}" using ring diffraction analysis.'.format(group.name))
+    
+    #import pdb; pdb.set_trace()
+    
+
+def run_all(parent, outfile, verbose=False):
+    '''
+    Run on a set-up emd file to do evaluations and save results.
+    
+    All evaluations within parent are run.
+    '''
+    
+    # get all groups with evaluations to do
+    todo = []
+    
+    # recursive function
+    def proc_group(grp, todo):
+        for item in grp:
+            if grp.get(item, getclass=True) == h5py._hl.group.Group:
+                item = grp.get(item)
+                if 'type' in item.attrs:
+                    if item.attrs['type'] == np.string_(cur_eva_vers):
+                        todo.append(item)
+                        if verbose:
+                            print('Found evaluation group at "{}".'.format(item.name) )
+                proc_group(item, todo)    
+    
+    proc_group(parent, todo)
+    
+    # run through all evaluations
+    for i in range(len(todo)):
+        run_sglgroup(todo[i], outfile, verbose=verbose)
+    
 
 
 def evaEMDFile(emdfile, outfile, verbose=False):

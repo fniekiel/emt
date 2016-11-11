@@ -24,8 +24,8 @@ def local_max(img, r, thresh):
     '''
     
     try:
-        assert(isinstance(r, int))
-        assert(isinstance(thresh, int))
+        r = int(r)
+        thresh = int(thresh)
         assert(isinstance(img, np.ndarray))
     except:
         raise TypeError('Bad input!')

@@ -39,9 +39,9 @@ class test_ringdiff(unittest.TestCase):
         with self.assertRaises(TypeError):
             points = emt.algo.local_max.local_max(42, 10, 600)
         with self.assertRaises(TypeError):
-            points = emt.algo.local_max.local_max(img, 10.0, 600)
+            points = emt.algo.local_max.local_max(img, 'ten', 600)
         with self.assertRaises(TypeError):
-            points = emt.algo.local_max.local_max(img, 10, 600.42)
+            points = emt.algo.local_max.local_max(img, 10, 'sixhundred')
             
         # no points detected
         self.assertIsNone (emt.algo.local_max.local_max(img, 10, 100000))
@@ -412,7 +412,7 @@ class test_ringdiff(unittest.TestCase):
                  'lmax_thresh': 600,
                  'lmax_cinit': (984, 1032),
                  'lmax_range': (6e9, 8e9),
-                 'plt_imgminmax': (0.0, 0.2),
+                 'plt_imgminmax': None,
                  'ns': (2,3,4),
                  'rad_rmax': None,
                  'rad_dr': None,
@@ -481,8 +481,88 @@ class test_ringdiff(unittest.TestCase):
                 self.assertTrue(comp.all())
         
         
+
+
+        ### single evaluation
+        femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
+        emdgrp = femd.list_emds[0]
+        
+        if os.path.isfile('resources/output/evaluation_Pt_SAED_D910mm_single.emd'):
+            os.remove('resources/output/evaluation_Pt_SAED_D910mm_single.emd')
+        femd_out = emt.io.emd.fileEMD('resources/output/evaluation_Pt_SAED_D910mm_single.emd')
         
         
+        # write evaluation details
+        grp_eva = femd_out.file_hdl.create_group('evaluation')
+        
+        hdl = emt.eva.ring_diff.put_sglgroup(grp_eva, 'Pt_SAED_D910mm_single', emdgrp)
+
+        # put the settings
+        settings = { 'lmax_r': 10,
+                 'lmax_thresh': 600,
+                 'lmax_cinit': (984, 1032),
+                 'lmax_range': (6e9, 8e9),
+                 'plt_imgminmax': (0.,0.2),
+                 'ns': (2,3,4),
+                 'rad_rmax': None,
+                 'rad_dr': None,
+                 'rad_sigma': None,
+                 'mask': None,
+                 'fit_rrange': (1.5e9, 9.5e9),
+                 'fit_funcs': ('const', 'powlaw', 'voigt'),
+                 'fit_init': ( 10,
+                               1.0e12, -1.0,
+                               5e10, 7.3e9, 1.1e7, 2.5e7 ),
+                 'fit_maxfev': None
+               }
+        emt.eva.ring_diff.put_settings(femd_out.file_hdl, settings)
+
+        # run the evaluation
+        emt.eva.ring_diff.run_sglgroup(hdl, femd_out, verbose=True, showplots=False)
+        
+        
+        
+        ### evaluation of a series
+        femd = emt.io.emd.fileEMD('resources/Au_SAED_D910mm_20x_at_800/Au_SAED_D910mm_20x_at_800.emd')
+        emdgrp = femd.list_emds[0]
+        
+        
+        if os.path.isfile('resources/output/evaluation_Au_SAED_D910mm_20x_at_800.emd'):
+            os.remove('resources/output/evaluation_Au_SAED_D910mm_20x_at_800.emd')
+        femd_out = emt.io.emd.fileEMD('resources/output/evaluation_Au_SAED_D910mm_20x_at_800.emd')
+        
+        # write evaluation details
+        grp_eva = femd_out.file_hdl.create_group('evaluation')
+        
+        hdl = emt.eva.ring_diff.put_sglgroup(grp_eva, 'Au_SAED_D910mm_20x_at_800', emdgrp)
+        
+        # put the settings
+        settings = { 'lmax_r': 16,
+                 'lmax_thresh': 270,
+                 'lmax_cinit': (1012, 1020),
+                 'lmax_range': (5.5e9, 7.5e9),
+                 'plt_imgminmax': (0.,0.4),
+                 'ns': (2,3,4),
+                 'rad_rmax': None,
+                 'rad_dr': None,
+                 'rad_sigma': None,
+                 'mask': None,
+                 'fit_rrange': (1.5e9, 9.5e9),
+                 'fit_funcs': ('const', 'powlaw', 'voigt'),
+                 'fit_init': ( 10,
+                               1.0e12, -1.0,
+                               5e10, 7.3e9, 1.1e7, 2.5e7 ),
+                 'fit_maxfev': None
+               }
+        emt.eva.ring_diff.put_settings(femd_out.file_hdl, settings)
+
+        # run the evaluation
+        emt.eva.ring_diff.run_sglgroup(hdl, femd_out, verbose=True, showplots=True)
+        
+        
+        #run all evaluations
+        #emt.eva.ring_diff.run_all(grp_eva, femd_out, verbose=True)
+
         #import pdb;pdb.set_trace()
         
         # wrong file
@@ -491,11 +571,6 @@ class test_ringdiff(unittest.TestCase):
         #        emt.eva.ring_diff.evaEMDFile(f)
                         
         # right file
-        femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
-        
-        if os.path.isfile('resources/output/evaluation.emd'):
-            os.remove('resources/output/evaluation.emd')
-        femd_out = emt.io.emd.fileEMD('resources/output/evaluation.emd')
         
         #emt.eva.ring_diff.evaEMDFile(femd, femd_out, verbose=True)
         

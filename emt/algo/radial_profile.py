@@ -38,7 +38,7 @@ def calc_polarcoords ( center, dims, ns=None, dists=None ):
         assert(len(dims[0])==3)
         
         # check orders
-        if ns:
+        if not ns is None:
             assert(len(ns)>=1)
         
             # check dists
@@ -55,7 +55,7 @@ def calc_polarcoords ( center, dims, ns=None, dists=None ):
     thes = np.arctan2(yy-center[1], xx-center[0])
     
     # correct for distortions
-    if ns:
+    if not ns is None:
         for i in range(len(ns)):
             rs /= emt.algo.distortion.rad_dis(thes, dists[i*2+1], dists[i*2+2], ns[i])
             
