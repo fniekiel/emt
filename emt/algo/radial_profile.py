@@ -331,6 +331,19 @@ def run_singleImage( img, dims, settings, show=False ):
     - res
     '''
     
+    try:
+        assert(isinstance(img, np.ndarray))
+        
+        # check if dims availabel
+        assert(len(dims)>=1)
+        assert(len(dims[0])==3)
+        
+        assert(type(settings) is dict)
+        
+    except:
+        raise RuntimeError('Something wrong with the input')
+        
+    
     # create a copy of settings to decouple
     mysettings = copy.deepcopy(settings)
     
@@ -395,7 +408,7 @@ def run_singleImage( img, dims, settings, show=False ):
     I = I - emt.algo.math.sum_functions(R, funcs_back, res_back)    
     
     
-    # working
+    # fit
     res = emt.algo.radial_profile.fit_radialprofile( R, I, mysettings['fit_funcs'], mysettings['fit_init'], maxfev=mysettings['fit_maxfev'])
     
     if show:

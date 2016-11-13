@@ -521,7 +521,7 @@ class test_ringdiff(unittest.TestCase):
         emt.eva.ring_diff.put_settings(femd_out.file_hdl, settings)
 
         # run the evaluation
-        emt.eva.ring_diff.run_sglgroup(hdl, femd_out, verbose=True, showplots=True)
+        emt.eva.ring_diff.run_sglgroup(hdl, femd_out, verbose=True, showplots=False)
         
         
         
@@ -541,9 +541,9 @@ class test_ringdiff(unittest.TestCase):
         
         # put the settings
         settings = { 'lmax_r': 16,
-                     'lmax_thresh': 270,
+                     'lmax_thresh': 250,
                      'lmax_cinit': (1012, 1020),
-                     'lmax_range': (6.0e9, 7.5e9),
+                     'lmax_range': (6.5e9, 7.3e9),
                      'plt_imgminmax': (0.,0.4),
                      'ns': (2,3,4),
                      'rad_rmax': None,
@@ -551,9 +551,9 @@ class test_ringdiff(unittest.TestCase):
                      'rad_sigma': None,
                      'mask': None,
                      'fit_rrange': (1.5e9, 9.5e9),
-                     'back_xs': (1.3e9, 1.5e9, 9.05e9),
+                     'back_xs': (1.5e9, 5.7e9, 9.05e9),
                      'back_xswidth': 0.05e9,
-                     'back_init': (1, 6e8, -7),
+                     'back_init': (1, 1.5e9, -0.8),
                      'fit_funcs': ('voigt','voigt','voigt','voigt','voigt'),
                      'fit_init': ( 3.4e10, 4.25e9, 1.1e7, 2.5e7,
                                    9.1e9, 4.90e9, 1.1e7, 2.5e7,
@@ -565,7 +565,7 @@ class test_ringdiff(unittest.TestCase):
         emt.eva.ring_diff.put_settings(femd_out.file_hdl, settings)
 
         # run the evaluation
-        emt.eva.ring_diff.run_sglgroup(hdl, femd_out, verbose=True, showplots=True)
+        emt.eva.ring_diff.run_sglgroup(hdl, femd_out, verbose=True, showplots=False)
         
         
         #run all evaluations

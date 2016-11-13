@@ -227,10 +227,8 @@ def run_sglgroup(group, outfile, verbose=False, showplots=False):
         distss[:,i] = dists[:]
         rawprofiles[:,i] = rawprofile[:,1]
         fits_back[:,i] = res_back[:]
-        
-        import pdb;pdb.set_trace()
-        
-        
+
+
     # save results in this group
     outfile.put_emdgroup('radial_profile', profiles, ( (profile[:,0], 'radial distance', dims[0][2]) , dims[2]), group)
     outfile.put_emdgroup('fit_results', fits, ( ( np.array(range(fits.shape[0])), 'parameters', '[]') , dims[2]), group)
