@@ -1,6 +1,7 @@
 digraph modules {
     rankdir = BT;
     labelloc = "b";
+    concentrate = true;
 
     subgraph "cluster_emt.io"{
     label = "emt.io";
@@ -34,6 +35,8 @@ digraph modules {
     label = "emt.cmdline_tools";
     
     "emt.cmdline_tools.ser2emd" [label="ser2emd"];
+    "emt.cmdline_tools.ringdiff_prepare" [label="ringdiff_prepare"];
+    "emt.cmdline_tools.ringdiff_run" [label="ringdiff_run"];
 
     }
     
@@ -49,4 +52,10 @@ digraph modules {
     "emt.io.emd" -> "emt.eva.ring_diff";
     
     "emt.io.ser" -> "emt.cmdline_tools.ser2emd";
+    
+    "emt.io.emd" -> "emt.cmdline_tools.ringdiff_prepare";
+    "emt.eva.ring_diff" -> "emt.cmdline_tools.ringdiff_prepare";
+    
+    "emt.io.emd" -> "emt.cmdline_tools.ringdiff_run";
+    "emt.eva.ring_diff" -> "emt.cmdline_tools.ringdiff_run";
 }
