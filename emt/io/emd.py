@@ -167,7 +167,18 @@ class fileEMD:
             for i in range(len(data.shape)):
                 dim = group['dim{}'.format(i+1)]
                 # save them as (vector, name, units)
-                dims.append( (dim[:], dim.attrs['name'], dim.attrs['units']) )
+                
+                if isinstance(dim.attrs['name'], np.ndarray):
+                    name = dim.attrs['name'][0]
+                else:
+                    name = dim.attrs['name']
+                
+                if isinstance(dim.attrs['units'], np.ndarray):
+                    units = dim.attrs['units'][0]
+                else:
+                    units = dim.attrs['units']
+                    
+                dims.append( (dim[:], name, units) )
             
             dims = tuple(dims)
             
@@ -203,7 +214,7 @@ class fileEMD:
         return dset
         
         
-    def put_emdgroup(self, label, data, dims, parent=None):
+    def put_emdgroup(self, label, data, dims, parent=None, overwrite=False):
         '''Put an emdtype dataset into the EMD file
         
         input:
@@ -230,35 +241,46 @@ class fileEMD:
         except:
             raise TypeError('Something wrong with the provided dims')
         
-        # write stuff do HDF5
+        # write stuff to HDF5
+        
+        # create group
         try:
-            # create group
             if parent:
                 if label in parent:
-                    print('"{}" already exists in "{}"'.format(label, parent.name))
-                    raise RuntimeError()
+                    if overwrite:
+                        print('overwriting "{}" in "{}"'.format(label, parent.name))
+                        del parent[label]
+                    else:
+                        print('"{}" already exists in "{}"'.format(label, parent.name))
+                        raise RuntimeError('"{}" already exists in "{}"'.format(label, parent.name))
                 grp = parent.create_group(label)
+                
             else:
                 if label in self.data:
-                    print('"{}" already exists in "{}"'.format(label, self.data.name))
-                    raise RuntimeError()
+                    if overwrite:
+                        print('overwriting "{}" in "{}"'.format(label, self.data.name))
+                        del self.data[label]
+                    else:
+                        print('"{}" already exists in "{}"'.format(label, self.data.name))
+                        raise RuntimeError('"{}" already exists in "{}"'.format(label, self.data.name))
+
                 grp = self.data.create_group(label)
-            
+                
             # add attribute
             grp.attrs['emd_group_type'] = 1
-            
+               
             # create dataset
             dset = grp.create_dataset('data', data=data)
-            
+             
             # create dim datasets
             for i in range(len(dims)):
                 self.write_dim('dim{}'.format(i+1), dims[i], grp)
-                
+                    
             # update emds list
             self.list_emds = self.find_emdgroups(self.file_hdl)
-                
+                    
             return grp
-            
+           
         except:
             print('Something went wrong trying to write the dataset.')
                 

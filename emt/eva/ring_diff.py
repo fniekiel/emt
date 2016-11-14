@@ -17,6 +17,24 @@ import h5py
 cur_set_vers = 'ring_diffraction_setting_vers0.1'
 cur_eva_vers = 'ring_diffraction_evaluation_vers0.1'
 
+dummie_settings = { 'lmax_r': 1,
+                    'lmax_thresh': 1,
+                    'lmax_cinit': (1,1),
+                    'lmax_range': (1.,2.),
+                    'plt_imgminmax': (0.0,1.0),
+                    'ns': (1,),
+                    'rad_rmax': 1,
+                    'rad_dr': 0.1,
+                    'rad_sigma': 0.1,
+                    'mask': np.ones((5,5)),
+                    'fit_rrange': (1.0, 2.0),
+                    'back_xs': (1.0, 2.0, 3.0),
+                    'back_xswidth': 0.1,
+                    'back_init': (1.0, 1.0, 1.0),
+                    'fit_funcs': ('voigt',),
+                    'fit_init': (1.0, 1.0, 1.0, 1.0),
+                    'fit_maxfev':10
+                  }
 
 def get_settings( parent ):
     '''
@@ -52,11 +70,18 @@ def get_settings( parent ):
     settings['back_init'] = parent.attrs['back_init']
     settings['fit_init'] = parent.attrs['fit_init']
     
-    in_funcs = parent.attrs['fit_funcs']
+    
+    if isinstance(parent.attrs['fit_funcs'], np.ndarray):
+        in_funcs = parent.attrs['fit_funcs'][0]
+    else:
+        in_funcs = parent.attrs['fit_funcs']
+    in_funcs = in_funcs.split(b',')
+        
     out_funcs = []
     for i in range(len(in_funcs)):
-        out_funcs.append(in_funcs[i].decode('utf-8'))
+        out_funcs.append(in_funcs[i].decode('utf-8').strip())
     settings['fit_funcs'] = tuple(out_funcs)
+    
     
     if 'plt_imgminmax' in parent.attrs:
         settings['plt_imgminmax'] = parent.attrs['plt_imgminmax']
@@ -135,8 +160,8 @@ def put_settings( parent, settings ):
     
     fit_funcs = []
     for i in range(len(settings['fit_funcs'])):
-        fit_funcs.append(np.string_(settings['fit_funcs'][i]))
-    grp_set.attrs['fit_funcs'] = fit_funcs
+        fit_funcs.append(settings['fit_funcs'][i])
+    grp_set.attrs['fit_funcs'] = np.string_(', '.join(fit_funcs))
     
     if not settings['plt_imgminmax'] is None:
         grp_set.attrs['plt_imgminmax'] = settings['plt_imgminmax']
@@ -189,7 +214,7 @@ def put_sglgroup(parent, label, data_grp):
     return grp
     
 
-def run_sglgroup(group, outfile, verbose=False, showplots=False):
+def run_sglgroup(group, outfile, overwrite=False, verbose=False, showplots=False):
     '''
     Run evaluation on a single group.
     
@@ -248,39 +273,56 @@ def run_sglgroup(group, outfile, verbose=False, showplots=False):
     fits_back = None
     
     # run evaluation with settings
-    for i in range(data.shape[2]):
-        profile, res, center, dists, rawprofile, res_back, myset = emt.algo.radial_profile.run_singleImage( data[:,:,i], dims[0:2], settings,  show=showplots)
+    if len(data.shape) == 3:
+        for i in range(data.shape[2]):
+            profile, res, center, dists, rawprofile, res_back, myset = emt.algo.radial_profile.run_singleImage( data[:,:,i], dims[0:2], settings,  show=showplots)
     
-        # after first run I know the size
-        if profiles is None:
-            profiles = np.zeros( (profile.shape[0], data.shape[2]) )
-            fits = np.zeros( (res.shape[0], data.shape[2]) )
-            centers = np.zeros( (2, data.shape[2]) )
-            distss = np.zeros( (dists.shape[0], data.shape[2]) )
-            rawprofiles = np.zeros( (rawprofile.shape[0], data.shape[2]) )
-            fits_back = np.zeros( (res_back.shape[0], data.shape[2]) )
-            
-        # assign data    
-        profiles[:,i] = profile[:,1]
-        fits[:,i] = res[:]
-        centers[:,i] = center[:]
-        distss[:,i] = dists[:]
-        rawprofiles[:,i] = rawprofile[:,1]
-        fits_back[:,i] = res_back[:]
+            # after first run I know the size
+            if profiles is None:
+                profiles = np.zeros( (profile.shape[0], data.shape[2]) )
+                fits = np.zeros( (res.shape[0], data.shape[2]) )
+                centers = np.zeros( (2, data.shape[2]) )
+                distss = np.zeros( (dists.shape[0], data.shape[2]) )
+                rawprofiles = np.zeros( (rawprofile.shape[0], data.shape[2]) )
+                fits_back = np.zeros( (res_back.shape[0], data.shape[2]) )
+                
+            # assign data    
+            profiles[:,i] = profile[:,1]
+            fits[:,i] = res[:]
+            centers[:,i] = center[:]
+            distss[:,i] = dists[:]
+            rawprofiles[:,i] = rawprofile[:,1]
+            fits_back[:,i] = res_back[:]
 
-    # save results in this group
-    outfile.put_emdgroup('radial_profile', profiles, ( (profile[:,0], 'radial distance', dims[0][2]) , dims[2]), group)
-    outfile.put_emdgroup('fit_results', fits, ( ( np.array(range(fits.shape[0])), 'parameters', '[]') , dims[2]), group)
-    outfile.put_emdgroup('centers', centers, ( ( np.array(range(2)), 'dimension', dims[0][2]) , dims[2]), group)    
-    outfile.put_emdgroup('distortions', distss, ( ( np.array(range(distss.shape[0])), 'parameters', '[]') , dims[2]), group)
-    outfile.put_emdgroup('radial_profile_noback', rawprofiles, ( (rawprofile[:,0], 'radial distance', dims[0][2]) , dims[2]), group)
-    outfile.put_emdgroup('back_results', fits_back, ( ( np.array(range(fits_back.shape[0])), 'background parameters', '[]') , dims[2]), group)
+        # save results in this group
+        outfile.put_emdgroup('radial_profile', profiles, ( (profile[:,0], 'radial distance', dims[0][2]) , dims[2]), parent=group, overwrite=overwrite)
+        outfile.put_emdgroup('fit_results', fits, ( ( np.array(range(fits.shape[0])), 'parameters', '[]') , dims[2]), parent=group, overwrite=overwrite)
+        outfile.put_emdgroup('centers', centers, ( ( np.array(range(2)), 'dimension', dims[0][2]) , dims[2]), parent=group, overwrite=overwrite)    
+        outfile.put_emdgroup('distortions', distss, ( ( np.array(range(distss.shape[0])), 'parameters', '[]') , dims[2]), parent=group, overwrite=overwrite)
+        outfile.put_emdgroup('radial_profile_noback', rawprofiles, ( (rawprofile[:,0], 'radial distance', dims[0][2]) , dims[2]), parent=group, overwrite=overwrite)
+        outfile.put_emdgroup('back_results', fits_back, ( ( np.array(range(fits_back.shape[0])), 'background parameters', '[]') , dims[2]), parent=group, overwrite=overwrite)
+    
+
+    elif len(data.shape) == 2:
+        profile, res, center, dists, rawprofile, res_back, myset = emt.algo.radial_profile.run_singleImage( data[:,:], dims, settings,  show=showplots)
+        
+        # save results in this group
+        outfile.put_emdgroup('radial_profile', profile[:,1], ( (profile[:,0], 'radial distance', dims[0][2]), ), parent=group, overwrite=overwrite)
+        outfile.put_emdgroup('fit_results', res, ( ( np.array(range(res.shape[0])), 'parameters', '[]'), ), parent=group, overwrite=overwrite)
+        outfile.put_emdgroup('centers', center, ( ( np.array(range(2)), 'dimension', dims[0][2]), ), parent=group, overwrite=overwrite)    
+        outfile.put_emdgroup('distortions', dists, ( ( np.array(range(dists.shape[0])), 'parameters', '[]'), ), parent=group, overwrite=overwrite)
+        outfile.put_emdgroup('radial_profile_noback', rawprofile[:,1], ( (rawprofile[:,0], 'radial distance', dims[0][2]), ), parent=group, overwrite=overwrite)
+        outfile.put_emdgroup('back_results', res_back, ( ( np.array(range(res_back.shape[0])), 'background parameters', '[]'), ), parent=group, overwrite=overwrite)
+
+    else:
+        raise RuntimeError('Cannot handle that data.')
+
     
     # save a log comment
     outfile.put_comment('Evaluated "{}" using ring diffraction analysis.'.format(group.name))
     
 
-def run_all(parent, outfile, verbose=False, showplots=False):
+def run_all(parent, outfile, overwrite=False, verbose=False, showplots=False):
     '''
     Run on a set-up emd file to do evaluations and save results.
     
@@ -310,6 +352,6 @@ def run_all(parent, outfile, verbose=False, showplots=False):
     
     # run through all evaluations
     for i in range(len(todo)):
-        run_sglgroup(todo[i], outfile, verbose=verbose, showplots=showplots)
+        run_sglgroup(todo[i], outfile, overwrite=overwrite, verbose=verbose, showplots=showplots)
     
 
