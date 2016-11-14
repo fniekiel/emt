@@ -13,6 +13,12 @@ def const( x, param):
     
     return param[0]*np.ones(x.shape)
 
+def linear( x, param):
+    '''
+    Linear function.
+    '''
+    
+    return param[0]*x + param[1]
 
 def powlaw( x, param):
     '''
@@ -59,6 +65,7 @@ def sum_functions( x, funcs, param ):
 
 # lookup table for functions
 lkp_funcs = { 'const': (const, 1),
+              'linear': (linear, 2),
               'powlaw': (powlaw, 2),
               'voigt': (voigt, 4)
             }

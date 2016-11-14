@@ -88,7 +88,7 @@ class test_ringdiff(unittest.TestCase):
         '''
         
         plt.close('all')
-        show=False
+        show=True
         
         # get an image
         femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
