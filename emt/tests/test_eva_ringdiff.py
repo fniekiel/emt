@@ -88,7 +88,7 @@ class test_ringdiff(unittest.TestCase):
         '''
         
         plt.close('all')
-        show=True
+        show=False
         
         # get an image
         femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
@@ -406,7 +406,6 @@ class test_ringdiff(unittest.TestCase):
             
         femd = emt.io.emd.fileEMD('resources/output/test_settings.emd')
         
-        
         ## minimum settings necessary, with many nones
         settings_minimum = { 'lmax_r': 10,
                  'lmax_thresh': 600,
@@ -426,12 +425,24 @@ class test_ringdiff(unittest.TestCase):
                  'fit_init': ( 5e10, 7.3e9, 1.1e7, 2.5e7 ),
                  'fit_maxfev': None
                }
-        
+            
         # put       
         par = femd.file_hdl.create_group('put_minimum')
+        
+        # wrong input
+        with self.assertRaises(TypeError):
+            emt.eva.ring_diff.put_settings( 'not_par', settings_minimum )
+        with self.assertRaises(TypeError):
+            emt.eva.ring_diff.put_settings( par, 42 )
+              
         emt.eva.ring_diff.put_settings( par, settings_minimum )
         
         # get
+        
+        # wrong input
+        with self.assertRaises(TypeError):
+            no_settings = emt.eva.ring_diff.get_settings('not a group')        
+        
         in_settings_minimum = emt.eva.ring_diff.get_settings( par['settings_ringdiffraction'] )
         
         # compare the two settings
@@ -443,7 +454,6 @@ class test_ringdiff(unittest.TestCase):
                 self.assertTrue(comp)
             else:
                 self.assertTrue(comp.all())
-        
         
         ## full settings with all parameters set
         settings_full = { 'lmax_r': 10,
@@ -483,8 +493,6 @@ class test_ringdiff(unittest.TestCase):
                 self.assertTrue(comp.all())
         
         
-
-
         ### single evaluation
         femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
         emdgrp = femd.list_emds[0]
@@ -493,9 +501,14 @@ class test_ringdiff(unittest.TestCase):
             os.remove('resources/output/evaluation_Pt_SAED_D910mm_single.emd')
         femd_out = emt.io.emd.fileEMD('resources/output/evaluation_Pt_SAED_D910mm_single.emd')
         
-        
         # write evaluation details
         grp_eva = femd_out.file_hdl.create_group('evaluation')
+        
+        # wrong input
+        with self.assertRaises(TypeError):
+            nohdl = emt.eva.ring_diff.put_sglgroup('nogroup', 'not_working', emdgrp)
+        with self.assertRaises(TypeError):
+            nohdl = emt.eva.ring_diff.put_sglgroup(grp_eva, 'not_working', 'nogroup')
         
         hdl = emt.eva.ring_diff.put_sglgroup(grp_eva, 'Pt_SAED_D910mm_single', emdgrp)
 
@@ -521,14 +534,18 @@ class test_ringdiff(unittest.TestCase):
         emt.eva.ring_diff.put_settings(femd_out.file_hdl, settings)
 
         # run the evaluation
+        # wrong input
+        with self.assertRaises(TypeError):
+            emt.eva.ring_diff.run_sglgroup(42, femd_out)
+        with self.assertRaises(TypeError):
+            emt.eva.ring_diff.run_sglgroup(hdl, 'notanemdfile')
+                    
         emt.eva.ring_diff.run_sglgroup(hdl, femd_out, verbose=True, showplots=False)
-        
         
         
         ### evaluation of a series
         femd = emt.io.emd.fileEMD('resources/Au_SAED_D910mm_20x_at_800/Au_SAED_D910mm_20x_at_800.emd')
         emdgrp = femd.list_emds[0]
-        
         
         if os.path.isfile('resources/output/evaluation_Au_SAED_D910mm_20x_at_800.emd'):
             os.remove('resources/output/evaluation_Au_SAED_D910mm_20x_at_800.emd')
@@ -568,21 +585,45 @@ class test_ringdiff(unittest.TestCase):
         emt.eva.ring_diff.run_sglgroup(hdl, femd_out, verbose=True, showplots=False)
         
         
-        #run all evaluations
-        #emt.eva.ring_diff.run_all(grp_eva, femd_out, verbose=True)
+        ### run multiple evaluations
+        ### single evaluation
+        femd = emt.io.emd.fileEMD('resources/Pt_SAED_D910mm_single/Pt_SAED_D910mm_single.emd')
+        emdgrp = femd.list_emds[0]
+        
+        if os.path.isfile('resources/output/evaluation_Pt_SAED_D910mm_multiple.emd'):
+            os.remove('resources/output/evaluation_Pt_SAED_D910mm_multiple.emd')
+        femd_out = emt.io.emd.fileEMD('resources/output/evaluation_Pt_SAED_D910mm_multiple.emd')
+        
+        # write evaluation details
+        grp_eva = femd_out.file_hdl.create_group('evaluation')
+        hdl = emt.eva.ring_diff.put_sglgroup(grp_eva, 'Pt_SAED_D910mm_first', emdgrp)
+        hdl = emt.eva.ring_diff.put_sglgroup(grp_eva, 'Pt_SAED_D910mm_second', emdgrp)
+        hdl = emt.eva.ring_diff.put_sglgroup(grp_eva, 'Pt_SAED_D910mm_third', emdgrp)
 
-        #import pdb;pdb.set_trace()
+        # put the settings
+        settings = { 'lmax_r': 10,
+                 'lmax_thresh': 600,
+                 'lmax_cinit': (984, 1032),
+                 'lmax_range': (6e9, 8e9),
+                 'plt_imgminmax': (0.,0.2),
+                 'ns': (2,3,4),
+                 'rad_rmax': None,
+                 'rad_dr': None,
+                 'rad_sigma': None,
+                 'mask': None,
+                 'fit_rrange': (1.5e9, 9.5e9),
+                 'back_xs': (1.3e9, 1.5e9, 9.05e9),
+                 'back_xswidth': 0.05e9,
+                 'back_init': (1, 1.0e12, -1.0),
+                 'fit_funcs': ('voigt',),
+                 'fit_init': ( 5e10, 7.3e9, 1.1e7, 2.5e7 ),
+                 'fit_maxfev': None
+               }
+        emt.eva.ring_diff.put_settings(grp_eva, settings)
         
-        # wrong file
-        #with self.assertRaises(RuntimeError):
-        #    with open('resources/output/test.txt', 'w') as f:
-        #        emt.eva.ring_diff.evaEMDFile(f)
-                        
-        # right file
+        emt.eva.ring_diff.run_all(grp_eva, femd_out, verbose=True, showplots=False)
         
-        #emt.eva.ring_diff.evaEMDFile(femd, femd_out, verbose=True)
-        
-        
+
         # wait for plots
         if show:
             plt.show()     

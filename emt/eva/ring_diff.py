@@ -21,7 +21,19 @@ cur_eva_vers = 'ring_diffraction_evaluation_vers0.1'
 def get_settings( parent ):
     '''
     Get settings for radial profile evaluation.
+    
+    input:
+    - parent     input group
+    
+    return:
+    - settings   settings read from parent
     '''
+    
+    try:
+        assert( isinstance(parent, h5py._hl.group.Group) )
+    except:
+        raise TypeError('Something wrong with the input.')
+    
     
     if not parent.attrs['type'] == np.string_(cur_set_vers):
         print('Don\'t  know the format of these settings.')
@@ -84,12 +96,27 @@ def put_settings( parent, settings ):
     Put settings for radial profile evaluation.
     
     Creates a subgroup in parent holding the settings as attributes.
-    '''
     
+    input:
+    - parent        group to hold settings subgroup
+    - setting       dict of settings to write
+    
+    return:
+    - grp_set       handle to settings group
+    '''
+ 
+    try:
+        assert( isinstance(parent, h5py._hl.group.Group) )
+        assert( type(settings) is dict )
+    except:
+        raise TypeError('Something wrong with the input.')
+    
+  
     try:
         grp_set = parent.create_group('settings_ringdiffraction')
     except:
         raise RuntimeError('Could not write to {}'.format(parent))
+        
         
     # set version information    
     grp_set.attrs['type'] = np.string_(cur_set_vers)
@@ -137,7 +164,18 @@ def put_sglgroup(parent, label, data_grp):
     - parent        hdf5 group to add this evaluation group to
     - label         label for the evaluation group    
     - data_grp      emdtype group where to find the data
+    
+    return:
+    - grp           handle to group
     '''
+    
+    try:
+        assert( isinstance(parent, h5py._hl.group.Group) )
+        label = str(label)
+        assert( isinstance(data_grp, h5py._hl.group.Group) )
+    except:
+        raise TypeError('Something wrong with the input')
+        
     
     # create the evaluation group
     grp = parent.create_group(label)
@@ -151,17 +189,22 @@ def put_sglgroup(parent, label, data_grp):
     return grp
     
 
-
 def run_sglgroup(group, outfile, verbose=False, showplots=False):
     '''
     Run evaluation on a single group.
+    
+    input:
+    - group         handle to evaluation group to execute
+    - outfile       emdfile for output
     '''
 
     try:
         assert(isinstance(group, h5py._hl.group.Group))
         assert( group.attrs['type'] == np.string_(cur_eva_vers) )
+        
+        assert(isinstance(outfile, emt.io.emd.fileEMD))
     except:
-        raise RuntimeError('Something wrong with the input.')
+        raise TypeError('Something wrong with the input.')
         
     
     if verbose:
@@ -173,7 +216,6 @@ def run_sglgroup(group, outfile, verbose=False, showplots=False):
         print('.. getting data from {}:{}'.format(group.attrs['filename'].decode('utf-8'), group.attrs['internal_path'].decode('utf-8')))
     readfile = emt.io.emd.fileEMD( group.attrs['filename'].decode('utf-8'), readonly=True )
     data, dims = readfile.get_emdgroup(readfile.file_hdl[group.attrs['internal_path'].decode('utf-8')])
-    
     
     # find the settings moving upwards in hierarchy
     if verbose:
@@ -197,7 +239,6 @@ def run_sglgroup(group, outfile, verbose=False, showplots=False):
             print('.. loading settings from {}.'.format(grp_set.name))
         settings = get_settings(grp_set)
     
-    
     # what data to collect
     profiles = None
     centers = None
@@ -205,7 +246,6 @@ def run_sglgroup(group, outfile, verbose=False, showplots=False):
     fits = None
     rawprofiles = None
     fits_back = None
-    
     
     # run evaluation with settings
     for i in range(data.shape[2]):
@@ -228,7 +268,6 @@ def run_sglgroup(group, outfile, verbose=False, showplots=False):
         rawprofiles[:,i] = rawprofile[:,1]
         fits_back[:,i] = res_back[:]
 
-
     # save results in this group
     outfile.put_emdgroup('radial_profile', profiles, ( (profile[:,0], 'radial distance', dims[0][2]) , dims[2]), group)
     outfile.put_emdgroup('fit_results', fits, ( ( np.array(range(fits.shape[0])), 'parameters', '[]') , dims[2]), group)
@@ -237,16 +276,19 @@ def run_sglgroup(group, outfile, verbose=False, showplots=False):
     outfile.put_emdgroup('radial_profile_noback', rawprofiles, ( (rawprofile[:,0], 'radial distance', dims[0][2]) , dims[2]), group)
     outfile.put_emdgroup('back_results', fits_back, ( ( np.array(range(fits_back.shape[0])), 'background parameters', '[]') , dims[2]), group)
     
+    # save a log comment
     outfile.put_comment('Evaluated "{}" using ring diffraction analysis.'.format(group.name))
     
-    #import pdb; pdb.set_trace()
-    
 
-def run_all(parent, outfile, verbose=False):
+def run_all(parent, outfile, verbose=False, showplots=False):
     '''
     Run on a set-up emd file to do evaluations and save results.
     
     All evaluations within parent are run.
+    
+    input:
+    - parent        handle to parent group
+    - outfile       emdfile to save evaluations
     '''
     
     # get all groups with evaluations to do
@@ -268,76 +310,6 @@ def run_all(parent, outfile, verbose=False):
     
     # run through all evaluations
     for i in range(len(todo)):
-        run_sglgroup(todo[i], outfile, verbose=verbose)
+        run_sglgroup(todo[i], outfile, verbose=verbose, showplots=showplots)
     
 
-
-def evaEMDFile(emdfile, outfile, verbose=False):
-    '''
-    Run on a single EMD file evaluating all images inside.
-    
-    input:
-    return:
-    '''
-    
-    try:
-        assert(isinstance(emdfile, emt.io.emd.fileEMD))
-    except:
-        raise RuntimeError('emdfile needs to be an emt.io.emd.fileEMD object!')
-    
-    try:
-        assert(isinstance(outfile, emt.io.emd.fileEMD))
-    except:
-        raise RuntimeError('outfile needs to be an emt.io.emd.fileEMD object!')
-    
-
-    # settings for evaluation
-    settings = { 'lmax_r': 10,
-                 'lmax_thresh': 600,
-                 'lmax_cinit': (984, 1032),
-                 'lmax_range': (6e9, 8e9),
-                 'plt_imgminmax': (0.0, 0.2),
-                 'ns': (2,3,4),
-                 'rad_rmax': None,
-                 'rad_dr': None,
-                 'rad_sigma': None,
-                 'mask': None,
-                 'fit_rrange': (1.5e9, 9.5e9),
-                 'back_xs': (1.3e9, 1.5e9, 9.05e9),
-                 'back_xswidth': 0.05e9,
-                 'back_init': (1, 1.0e12, -1.0),
-                 'fit_funcs': ('voigt',),
-                 'fit_init': ( 5e10, 7.3e9, 1.1e7, 2.5e7 ),
-                 'fit_maxfev': None
-               }
-                   
-    # set up output emdfile
-    grp_eva = outfile.file_hdl.create_group('evaluation')
-    put_settings( grp_eva, settings)
-    
-    
-    print(emdfile.list_emds)
-    for emdgrp in emdfile.list_emds:
-        if verbose:
-            print('working on {}'.format(emdgrp.name))
-            
-        # get the data
-        data, dims = emdfile.get_emdgroup(emdgrp)
-        
-        # assuming stacks of images
-        try:
-            assert(len(data.shape) == 3)
-        except:
-            raise RuntimeError('Dont know how to handle that data.')
-        
-        # get parameters from meta
-        
-        
-         
-        # evaluate image
-        for i in range(data.shape[2]):
-            profile, res, center, dists, myset = emt.algo.radial_profile.run_singleImage( data[:,:,i], dims[0:2], settings,  show=verbose)
-            
-        #import pdb;pdb.set_trace()
-    
-    return None
