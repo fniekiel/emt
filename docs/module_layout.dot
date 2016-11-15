@@ -44,6 +44,7 @@ digraph modules {
     label = "emt.gui_tools";
     
     "emt.gui_tools.ser2emd" [label="ser2emd"];
+    "emt.gui_tools.ringdiff" [label="ringdiff"];
     
     }
     
