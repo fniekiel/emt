@@ -1,7 +1,7 @@
 digraph modules {
     rankdir = BT;
     labelloc = "b";
-    concentrate = true;
+    //concentrate = true;
 
     subgraph "cluster_emt.io"{
     label = "emt.io";
@@ -40,6 +40,13 @@ digraph modules {
 
     }
     
+    subgraph "cluster_emt.gui_tools" {
+    label = "emt.gui_tools";
+    
+    "emt.gui_tools.ser2emd" [label="ser2emd"];
+    
+    }
+    
     "emt.io.emd" -> "emt.io.ser";
     
     "emt.algo.distortion" -> "emt.algo.radial_profile";
@@ -58,4 +65,6 @@ digraph modules {
     
     "emt.io.emd" -> "emt.cmdline_tools.ringdiff_run";
     "emt.eva.ring_diff" -> "emt.cmdline_tools.ringdiff_run";
+    
+    "emt.io.ser" -> "emt.gui_tools.ser2emd";
 }
