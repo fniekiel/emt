@@ -231,12 +231,13 @@ class Main(QtGui.QMainWindow):
                 raise
         
             data, dims = self.femd_in.get_emdgroup(self.femd_in.list_emds[0])
-            data = np.swapaxes(data, 0,2)
-            data = np.swapaxes(data, 1,2)
+            data = data[:,:,0]
+            #data = np.swapaxes(data, 0,2)
+            #data = np.swapaxes(data, 1,2)
         
         
             # find local max
-            points = emt.algo.local_max.local_max(data[0,:,:], max_r, thresh)
+            points = emt.algo.local_max.local_max(data, max_r, thresh)
             
             # working in px for now
             
@@ -247,12 +248,20 @@ class Main(QtGui.QMainWindow):
             self.points = points
             
         
+            self.plt_polar.plot(points[:,1], points[:,0], pen=None, symbol='o', symbolPen=(255,0,0), symbolBrush=None)
+            
+            img = pg.ImageItem(data.astype('float64'))
+            self.plt_polar.addItem(img)
+            img.setZValue(-100)
+            #img.setRect(pg.QtCore.QRectF(0,0,2047,2047))
+            
+        
             self.imv_localmax.setImage(data)
             
             
             
             
-            import pdb;pdb.set_trace()
+            #import pdb;pdb.set_trace()
 
     
 
