@@ -30,7 +30,8 @@ class Main(QtGui.QMainWindow):
         self.plt_polar = None
         self.plt_radprof = None
         
-        
+        self.data = None
+        self.dims = None
         self.points = None
         
         self.initUI()
@@ -138,7 +139,8 @@ class Main(QtGui.QMainWindow):
         vbox_left.addStretch(1)
         
         
-        self.imv_localmax = pg.ImageView()
+        self.plt_localmax = pg.PlotItem()
+        self.imv_localmax = pg.ImageView(view=self.plt_localmax)
         
         
         
@@ -209,6 +211,16 @@ class Main(QtGui.QMainWindow):
             self.femd_in = emt.io.emd.fileEMD(fname, readonly=True)
             
             self.gui_file['in_txt'].setText(fname)
+            
+            data, dims = self.femd_in.get_emdgroup(self.femd_in.list_emds[0])
+            
+            data = np.swapaxes(data, 0,2)
+            data = np.swapaxes(data, 1,2)
+            
+            self.data = np.copy(data)
+            self.dims = dims
+            
+            self.imv_localmax.setImage(self.data)
         except: 
             self.gui_file['in_txt'].setText('')
             raise
@@ -230,12 +242,8 @@ class Main(QtGui.QMainWindow):
             except:
                 raise
         
-            data, dims = self.femd_in.get_emdgroup(self.femd_in.list_emds[0])
-            data = data[:,:,0]
-            #data = np.swapaxes(data, 0,2)
-            #data = np.swapaxes(data, 1,2)
-        
-        
+            data = np.copy(self.data[0,:,:])
+
             # find local max
             points = emt.algo.local_max.local_max(data, max_r, thresh)
             
@@ -244,19 +252,25 @@ class Main(QtGui.QMainWindow):
             # filter to single ring
             points = emt.algo.distortion.filter_ring(points, cinit, rrange)
         
-        
-            self.points = points
+            self.points = np.copy(points)
             
         
-            self.plt_polar.plot(points[:,1], points[:,0], pen=None, symbol='o', symbolPen=(255,0,0), symbolBrush=None)
+            #self.imv_localmax.close()
+            self.imv_localmax = pg.ImageView(view=self.plt_localmax)
+            #self.right.addTab(self.imv_localmax, 'Local Maxima')
+        
+            #self.plt_localmax.clear()
+            #self.imv_localmax.clear()
+            self.imv_localmax.setImage(self.data.astype('int32'))
+            self.plt_localmax.plot(points[:,1], points[:,0], pen=None, symbol='o', symbolPen=(255,0,0), symbolBrush=None)
             
-            img = pg.ImageItem(data.astype('float64'))
-            self.plt_polar.addItem(img)
-            img.setZValue(-100)
+            #img = pg.ImageItem(data.astype('float64'))
+            #self.plt_polar.addItem(img)
+            #img.setZValue(-100)
             #img.setRect(pg.QtCore.QRectF(0,0,2047,2047))
             
         
-            self.imv_localmax.setImage(data)
+            
             
             
             
