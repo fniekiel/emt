@@ -26,7 +26,7 @@ class Main(QtGui.QMainWindow):
         self.femd_in = None
         self.gui_localmax = {}
         
-        self.imv_localmax = None
+        self.plt_localmax = None
         self.plt_polar = None
         self.plt_radprof = None
         
@@ -126,6 +126,26 @@ class Main(QtGui.QMainWindow):
         hbox_lmax_range.addWidget(self.gui_localmax['txt_lmax_range'])
         layout_localmax.addLayout(hbox_lmax_range)
         
+        self.gui_localmax['min_lbl'] = QtGui.QLabel('min: ', frame_localmax)
+        self.gui_localmax['min_slider'] = QtGui.QSlider(QtCore.Qt.Orientation.Horizontal, frame_localmax)
+        self.gui_localmax['min_slider'].valueChanged.connect(self.on_intensitySlider)
+        self.gui_localmax['min_value'] = QtGui.QLabel('0', frame_localmax)
+        hbox_lmax_min = QtGui.QHBoxLayout()
+        hbox_lmax_min.addWidget(self.gui_localmax['min_lbl'])
+        hbox_lmax_min.addWidget(self.gui_localmax['min_slider'])
+        hbox_lmax_min.addWidget(self.gui_localmax['min_value'])
+        layout_localmax.addLayout(hbox_lmax_min)
+        
+        self.gui_localmax['max_lbl'] = QtGui.QLabel('max: ', frame_localmax)
+        self.gui_localmax['max_slider'] = QtGui.QSlider(QtCore.Qt.Orientation.Horizontal, frame_localmax)
+        self.gui_localmax['max_slider'].valueChanged.connect(self.on_intensitySlider)
+        self.gui_localmax['max_value'] = QtGui.QLabel('0', frame_localmax)
+        hbox_lmax_max = QtGui.QHBoxLayout()
+        hbox_lmax_max.addWidget(self.gui_localmax['max_lbl'])
+        hbox_lmax_max.addWidget(self.gui_localmax['max_slider'])
+        hbox_lmax_max.addWidget(self.gui_localmax['max_value'])
+        layout_localmax.addLayout(hbox_lmax_max)
+        
         self.gui_localmax['upd_btn'] = QtGui.QPushButton('Update', frame_localmax)
         self.gui_localmax['upd_btn'].clicked[bool].connect(self.update_localmax)
         
@@ -139,8 +159,9 @@ class Main(QtGui.QMainWindow):
         vbox_left.addStretch(1)
         
         
-        self.plt_localmax = pg.PlotItem()
-        self.imv_localmax = pg.ImageView(view=self.plt_localmax)
+        self.plt_localmax = pg.PlotWidget()
+        self.plt_localmax.setAspectLocked()
+        #self.imv_localmax = pg.ImageView(view=self.plt_localmax)
         
         
         
@@ -159,7 +180,7 @@ class Main(QtGui.QMainWindow):
         #hbox.addStretch(1)
         
         self.right = QtGui.QTabWidget(self.mnwid)
-        self.right.addTab(self.imv_localmax, 'Local Maxima')
+        self.right.addTab(self.plt_localmax, 'Local Maxima')
         self.right.addTab(self.plt_polar, 'Polar Plot')
         self.right.addTab(self.plt_radprof, 'Radial Profile')
         #hbox_right = QtGui.QHBoxLayout(self.right)
@@ -214,16 +235,36 @@ class Main(QtGui.QMainWindow):
             
             data, dims = self.femd_in.get_emdgroup(self.femd_in.list_emds[0])
             
-            data = np.swapaxes(data, 0,2)
-            data = np.swapaxes(data, 1,2)
+            #data = np.swapaxes(data, 0,2)
+            #data = np.swapaxes(data, 1,2)
             
             self.data = np.copy(data)
             self.dims = dims
             
-            self.imv_localmax.setImage(self.data)
+            
+            self.gui_localmax['min_slider'].setMinimum(np.min(self.data))
+            self.gui_localmax['min_slider'].setMaximum(np.max(self.data))
+            
+            self.gui_localmax['max_slider'].setMinimum(np.min(self.data))
+            self.gui_localmax['max_slider'].setMaximum(np.max(self.data))
+            
+            
+            self.plt_localmax.clear()
+            img = pg.ImageItem(self.data[:,:,0].astype('float64'), levels=(self.gui_localmax['min_slider'].value(), self.gui_localmax['max_slider'].value()))
+            img.setZValue(-100)
+            self.test_img = img
+            self.plt_localmax.addItem(img)
+            
         except: 
             self.gui_file['in_txt'].setText('')
             raise
+    
+    
+    def on_intensitySlider(self):
+        self.gui_localmax['min_value'].setText('{:d}'.format(self.gui_localmax['min_slider'].value()))
+        self.gui_localmax['max_value'].setText('{:d}'.format(self.gui_localmax['max_slider'].value()))      
+        self.test_img.setLevels( (self.gui_localmax['min_slider'].value(), self.gui_localmax['max_slider'].value()) )
+
 
     def update_localmax(self):
         
@@ -242,7 +283,7 @@ class Main(QtGui.QMainWindow):
             except:
                 raise
         
-            data = np.copy(self.data[0,:,:])
+            data = np.copy(self.data[:,:,0])
 
             # find local max
             points = emt.algo.local_max.local_max(data, max_r, thresh)
@@ -253,31 +294,19 @@ class Main(QtGui.QMainWindow):
             points = emt.algo.distortion.filter_ring(points, cinit, rrange)
         
             self.points = np.copy(points)
-            
         
-            #self.imv_localmax.close()
-            self.imv_localmax = pg.ImageView(view=self.plt_localmax)
-            #self.right.addTab(self.imv_localmax, 'Local Maxima')
-        
-            #self.plt_localmax.clear()
-            #self.imv_localmax.clear()
-            self.imv_localmax.setImage(self.data.astype('int32'))
+            self.plt_localmax.clear()
             self.plt_localmax.plot(points[:,1], points[:,0], pen=None, symbol='o', symbolPen=(255,0,0), symbolBrush=None)
             
-            #img = pg.ImageItem(data.astype('float64'))
-            #self.plt_polar.addItem(img)
-            #img.setZValue(-100)
+            img = pg.ImageItem(self.data[:,:,0].astype('float64'), levels=(self.gui_localmax['min_slider'].value(), self.gui_localmax['max_slider'].value()))
+            img.setZValue(-100)
+            self.test_img = img
+            self.plt_localmax.addItem(img)
+            
             #img.setRect(pg.QtCore.QRectF(0,0,2047,2047))
             
-        
-            
-            
-            
-            
-            
-            #import pdb;pdb.set_trace()
 
-    
+            #import pdb;pdb.set_trace()
 
 
 if __name__ == '__main__':
