@@ -68,4 +68,8 @@ digraph modules {
     "emt.eva.ring_diff" -> "emt.cmdline_tools.ringdiff_run";
     
     "emt.io.ser" -> "emt.gui_tools.ser2emd";
+    
+    "emt.io.emd" -> "emt.gui_tools.ringdiff";
+    "emt.algo.local_max" -> "emt.gui_tools.ringdiff";
+    "emt.algo.distortion" -> "emt.gui_tools.ringdiff";
 }

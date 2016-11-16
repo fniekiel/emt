@@ -29,6 +29,9 @@ def filter_ring(points, center, rminmax):
         # center can either be tuple or np.array    
         center = np.array(center)
         center = np.reshape(center, 2)
+        
+        rminmax = np.array(rminmax)
+        rminmax = np.reshape(rminmax, 2)
    
     except:
         raise TypeError('Something wrong with the input!')
