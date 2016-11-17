@@ -41,6 +41,7 @@ class Main(QtGui.QMainWindow):
         self.center = None
         self.dists = None
         self.radprof = None
+        self.back_params = None
         
         self.initUI()
         
@@ -122,9 +123,12 @@ class Main(QtGui.QMainWindow):
         
         self.gui_localmax['lbl_lmax_cinit'] = QtGui.QLabel('init center: ')
         self.gui_localmax['txt_lmax_cinit'] = QtGui.QLineEdit( '', frame_localmax)
+        self.gui_localmax['btn_lmax_cinit'] = QtGui.QPushButton( 'Select', frame_localmax)
+        self.gui_localmax['btn_lmax_cinit'].clicked.connect(self.on_selectCinit)
         hbox_lmax_cinit = QtGui.QHBoxLayout()
         hbox_lmax_cinit.addWidget(self.gui_localmax['lbl_lmax_cinit'])
         hbox_lmax_cinit.addWidget(self.gui_localmax['txt_lmax_cinit'])
+        hbox_lmax_cinit.addWidget(self.gui_localmax['btn_lmax_cinit'])
         layout_localmax.addLayout(hbox_lmax_cinit)
         
         self.gui_localmax['lbl_lmax_range'] = QtGui.QLabel('radial range: ', frame_localmax)
@@ -236,6 +240,56 @@ class Main(QtGui.QMainWindow):
         self.gui_radprof['ext_btn'].clicked.connect(self.on_extractRadProf)
         layout_radprof.addWidget(self.gui_radprof['ext_btn'])
         
+        self.gui_radprof['fitxs_lbl'] = QtGui.QLabel('supp. x: ', frame_radprof)
+        self.gui_radprof['fitxs_txt'] = QtGui.QLineEdit('', frame_radprof)
+        self.gui_radprof['fitxs_btn'] = QtGui.QPushButton('Select', frame_radprof)
+        self.gui_radprof['fitxs_btn'].setCheckable(True)
+        self.gui_radprof['fitxs_btn'].clicked[bool].connect(self.on_selectXs)
+        hbox_radprof_fitxs = QtGui.QHBoxLayout()
+        hbox_radprof_fitxs.addWidget(self.gui_radprof['fitxs_lbl'])
+        hbox_radprof_fitxs.addWidget(self.gui_radprof['fitxs_txt'])
+        hbox_radprof_fitxs.addWidget(self.gui_radprof['fitxs_btn'])
+        layout_radprof.addLayout(hbox_radprof_fitxs)
+        
+        self.gui_radprof['fitxsw_lbl'] = QtGui.QLabel('width: ', frame_radprof)
+        self.gui_radprof['fitxsw_txt'] = QtGui.QLineEdit('', frame_radprof)
+        hbox_radprof_fitxsw = QtGui.QHBoxLayout()
+        hbox_radprof_fitxsw.addWidget(self.gui_radprof['fitxsw_lbl'])
+        hbox_radprof_fitxsw.addWidget(self.gui_radprof['fitxsw_txt'])
+        layout_radprof.addLayout(hbox_radprof_fitxsw)
+        
+        self.gui_radprof['back_init_label'] = QtGui.QLabel('init offset, ampl., exp.: ')
+        self.gui_radprof['back_init_txt'] = QtGui.QLineEdit('', frame_radprof)
+        hbox_radprof_backinit = QtGui.QHBoxLayout()
+        hbox_radprof_backinit.addWidget(self.gui_radprof['back_init_label'])
+        hbox_radprof_backinit.addWidget(self.gui_radprof['back_init_txt'])
+        layout_radprof.addLayout(hbox_radprof_backinit)
+        
+        self.gui_radprof['fitback_btn'] = QtGui.QPushButton('Fit Background', frame_radprof)
+        self.gui_radprof['fitback_btn'].clicked.connect(self.on_subtractBackground)
+        self.gui_radprof['back_check'] = QtGui.QCheckBox('Subtract Background', frame_radprof)
+        self.gui_radprof['back_check'].stateChanged.connect(self.update_RadProf)
+        #self.gui_radprof['back_btn'].setCheckable(True)
+        #self.gui_radprof['back_btn'].clicked.connect(self.on_subtractBackground)
+        hbox_radprof_backbtn = QtGui.QHBoxLayout()
+        hbox_radprof_backbtn.addWidget(self.gui_radprof['fitback_btn'])
+        hbox_radprof_backbtn.addWidget(self.gui_radprof['back_check'])
+        layout_radprof.addLayout(hbox_radprof_backbtn)
+        
+        self.gui_radprof['fit_tbl'] = QtGui.QTableWidget(4,2, frame_radprof)
+        layout_radprof.addWidget(self.gui_radprof['fit_tbl'])
+        
+        self.gui_radprof['fit_add_btn'] = QtGui.QPushButton('Add', frame_radprof)
+        self.gui_radprof['fit_del_btn'] = QtGui.QPushButton('Delete', frame_radprof)
+        hbox_radprof_fitbtns = QtGui.QHBoxLayout()
+        hbox_radprof_fitbtns.addWidget(self.gui_radprof['fit_add_btn'])
+        hbox_radprof_fitbtns.addWidget(self.gui_radprof['fit_del_btn'])
+        layout_radprof.addLayout(hbox_radprof_fitbtns)
+        
+        self.gui_radprof['fit_btn'] = QtGui.QPushButton('Fit Radial Profile', frame_radprof)
+        self.gui_radprof['fit_btn'].clicked.connect(self.on_fitRadProf)
+        layout_radprof.addWidget(self.gui_radprof['fit_btn'])
+        
         vbox_left = QtGui.QVBoxLayout()
         vbox_left.addWidget(frame_files)
         vbox_left.addWidget(frame_localmax)
@@ -286,7 +340,7 @@ class Main(QtGui.QMainWindow):
         
         self.mnwid.setLayout(hbox)
         
-        self.setGeometry(300,300,1024+512,1024)
+        self.setGeometry(300,300,1500,1024)
         self.setWindowTitle('Evaluation of Ring Diffraction Patterns')
         
         self.show()
@@ -448,6 +502,11 @@ class Main(QtGui.QMainWindow):
             
             
     
+    def on_selectCinit(self):
+        pass
+        
+            
+    
     def update_polar(self):
         '''
         Update the polar plot depending on which data is present.
@@ -553,8 +612,39 @@ class Main(QtGui.QMainWindow):
         self.plt_radprof.clear()
         
         if not self.radprof is None:
+        
+            # rad profile has been calculated
+            R = np.copy(self.radprof[:,0])
+            I = np.copy(self.radprof[:,1])
+        
+            back = None
+        
+            if not self.back_params is None:
             
-            self.plt_radprof.plot(self.radprof[:,0], self.radprof[:,1], pen=(255,0,0))
+                if 'back_xs' in self.settings:
+                    # calulate background
+                    fit_R = np.array([])
+                    fit_I = np.array([])
+                    for xpoint in self.settings['back_xs']:
+                        ix = np.where( np.abs(R-xpoint) <= self.settings['back_xswidth'])
+                        fit_R = np.append(fit_R, R[ix])
+                        fit_I = np.append(fit_I, I[ix])
+                       
+                    back = emt.algo.math.sum_functions( R, ('const', 'powlaw'), self.back_params )
+     
+                    if not self.gui_radprof['back_check'].isChecked():
+                        self.plt_radprof.plot(fit_R, fit_I, pen=None, symbol='x', symbolPen=(0,0,0))
+                        self.plt_radprof.plot(R, back, pen=(0,0,255))
+     
+     
+            if self.gui_radprof['back_check'].isChecked() and not back is None:
+                # subtract background
+                I -= back
+                        
+            #import pdb;pdb.set_trace()            
+                        
+            self.plt_radprof.plot(R, I, pen=(255,0,0))
+        
         
         
     
@@ -598,13 +688,73 @@ class Main(QtGui.QMainWindow):
     
         # update the plot
         self.update_RadProf()
-    
-        import pdb;pdb.set_trace()
-    
-    
+
+
+
     def on_mask(self):
         pass
-
+        
+        
+        
+    def on_subtractBackground(self):
+        '''
+        Fit power law background and subtract.
+        '''
+        
+        # parse the input
+        try:
+            fitxs_width = float(self.gui_radprof['fitxsw_txt'].text())
+                
+            fitxs = self.gui_radprof['fitxs_txt'].text().strip()
+            back_init = self.gui_radprof['back_init_txt'].text().strip()    
+                
+            if fitxs == '':
+                fitxs = []
+            else:
+                fitxs = [float(item.strip()) for item in fitxs.split(',')]
+                assert(len(fitxs) >= 1)
+            
+            if back_init == '':
+                back_init = [1,1,1]
+            else:
+                back_init = [float(item.strip()) for item in back_init.split(',')]
+                assert(len(back_init) == 3)
+        except:
+            raise TypeError('Bad input to subtract background')
+            
+        # save settings
+        self.settings['back_xs'] = fitxs
+        self.settings['back_xswidth'] = fitxs_width
+        self.settings['back_init'] = back_init
+       
+        # get background points
+        fit_R = np.array([])
+        fit_I = np.array([])
+        for xpoint in self.settings['back_xs']:
+            ix = np.where( np.abs(self.radprof[:,0]-xpoint) <= self.settings['back_xswidth'])
+            fit_R = np.append(fit_R, self.radprof[ix,0])
+            fit_I = np.append(fit_I, self.radprof[ix,1])
+        
+        # fit power law
+        funcs_back = [ 'const', 'powlaw' ]
+        res_back = emt.algo.radial_profile.fit_radialprofile( fit_R, fit_I, funcs_back, self.settings['back_init'], maxfev=1000 )
+        
+        # save output
+        self.back_params = res_back
+        
+        self.update_RadProf()
+       
+       
+    
+    def on_selectXs(self, status):
+        pass
+        
+   
+   
+    def on_fitRadProf(self):
+        pass
+    
+    
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
     main = Main()
