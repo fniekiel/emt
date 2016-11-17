@@ -178,7 +178,7 @@ class fileEMD:
                 else:
                     units = dim.attrs['units']
                     
-                dims.append( (dim[:], name, units) )
+                dims.append( (dim[:], name.decode('utf-8'), units.decode('utf-8')) )
             
             dims = tuple(dims)
             

@@ -48,7 +48,7 @@ def calc_polarcoords ( center, dims, ns=None, dists=None ):
         raise TypeError('Something wrong with the input!')
     
     # create coordinates
-    xx, yy = np.meshgrid( dims[0][0], dims[1][0] )
+    xx, yy = np.meshgrid( dims[0][0], dims[1][0], indexing='ij' )
     
     # calculate polar coordinate system
     rs = np.sqrt( np.square(xx-center[0]) + np.square(yy-center[1]) )
@@ -57,8 +57,8 @@ def calc_polarcoords ( center, dims, ns=None, dists=None ):
     # correct for distortions
     if not ns is None:
         for i in range(len(ns)):
-            rs /= emt.algo.distortion.rad_dis(thes, dists[i*2+1], dists[i*2+2], ns[i])
-            
+            rs /= emt.algo.distortion.rad_dis(thes, dists[i*2+1], dists[i*2+2], ns[i])    
+    
     return rs, thes
     
     

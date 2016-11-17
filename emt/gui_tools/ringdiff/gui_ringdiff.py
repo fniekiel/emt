@@ -9,6 +9,7 @@ import numpy as np
 import emt.io.emd
 import emt.algo.local_max
 import emt.algo.distortion
+import emt.algo.radial_profile
 
 from PySide import QtGui, QtCore
 
@@ -26,6 +27,7 @@ class Main(QtGui.QMainWindow):
         self.femd_in = None
         self.gui_localmax = {}
         self.gui_polar = {}
+        self.gui_radprof = {}
         
         self.plt_localmax = None
         self.plt_localmax_img = None
@@ -36,6 +38,9 @@ class Main(QtGui.QMainWindow):
         self.dims = None
         self.settings = {}
         self.points = None
+        self.center = None
+        self.dists = None
+        self.radprof = None
         
         self.initUI()
         
@@ -129,6 +134,10 @@ class Main(QtGui.QMainWindow):
         hbox_lmax_range.addWidget(self.gui_localmax['txt_lmax_range'])
         layout_localmax.addLayout(hbox_lmax_range)
         
+        self.gui_localmax['lmax_btn'] = QtGui.QPushButton('Find Local Maxima', frame_localmax)
+        self.gui_localmax['lmax_btn'].clicked.connect(self.on_localmax)
+        layout_localmax.addWidget(self.gui_localmax['lmax_btn'])
+        
         self.gui_localmax['min_lbl'] = QtGui.QLabel('min: ', frame_localmax)
         self.gui_localmax['min_slider'] = QtGui.QSlider(QtCore.Qt.Orientation.Horizontal, frame_localmax)
         self.gui_localmax['min_slider'].setMinimum(0)
@@ -153,9 +162,9 @@ class Main(QtGui.QMainWindow):
         hbox_lmax_max.addWidget(self.gui_localmax['max_value'])
         layout_localmax.addLayout(hbox_lmax_max)
         
-        self.gui_localmax['upd_btn'] = QtGui.QPushButton('Update', frame_localmax)
-        self.gui_localmax['upd_btn'].clicked.connect(self.update_localmax)
-        layout_localmax.addWidget(self.gui_localmax['upd_btn'])
+        #self.gui_localmax['upd_btn'] = QtGui.QPushButton('Update', frame_localmax)
+        #self.gui_localmax['upd_btn'].clicked.connect(self.update_localmax)
+        #layout_localmax.addWidget(self.gui_localmax['upd_btn'])
 
 
         ## polar plot stuff
@@ -169,20 +178,76 @@ class Main(QtGui.QMainWindow):
         hbox_polar_lbl.addStretch(1)
         layout_polar.addLayout(hbox_polar_lbl) 
         
-        self.gui_polar['upd_btn'] = QtGui.QPushButton('Update', frame_polar)
-        self.gui_polar['upd_btn'].clicked.connect(self.update_polar)
-        layout_polar.addWidget(self.gui_polar['upd_btn'])
+        self.gui_polar['center_lbl'] = QtGui.QLabel('center: ', frame_polar)
+        self.gui_polar['cencpy_btn'] = QtGui.QPushButton('Copy Init', frame_polar)
+        self.gui_polar['cencpy_btn'].clicked.connect(self.on_copyCenter)
+        hbox_polar_center = QtGui.QHBoxLayout()
+        hbox_polar_center.addWidget(self.gui_polar['center_lbl'])
+        hbox_polar_center.addWidget(self.gui_polar['cencpy_btn'])
+        layout_polar.addLayout(hbox_polar_center)
+        
+        self.gui_polar['cenopt_btn'] = QtGui.QPushButton('Optimize Center', frame_polar)
+        self.gui_polar['cenopt_btn'].clicked.connect(self.on_optimizeCenter)
+        layout_polar.addWidget(self.gui_polar['cenopt_btn'])
+        
+        self.gui_polar['dist_lbl'] = QtGui.QLabel('distortion orders: ', frame_polar)
+        self.gui_polar['dist_txt'] = QtGui.QLineEdit('', frame_polar)
+        hbox_polar_dists = QtGui.QHBoxLayout()
+        hbox_polar_dists.addWidget(self.gui_polar['dist_lbl'])
+        hbox_polar_dists.addWidget(self.gui_polar['dist_txt'])
+        layout_polar.addLayout(hbox_polar_dists)
+        
+        self.gui_polar['dists_btn'] = QtGui.QPushButton('Fit Distortions', frame_polar)
+        self.gui_polar['dists_btn'].clicked.connect(self.on_fitDist)
+        layout_polar.addWidget(self.gui_polar['dists_btn'])
+        
+        #self.gui_polar['upd_btn'] = QtGui.QPushButton('Update', frame_polar)
+        #self.gui_polar['upd_btn'].clicked.connect(self.update_polar)
+        #layout_polar.addWidget(self.gui_polar['upd_btn'])
+        
+        
+        ## radial profile stuff
+        frame_radprof = QtGui.QFrame(self.mnwid)
+        frame_radprof.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
+        layout_radprof = QtGui.QVBoxLayout(frame_radprof)
+        
+        label_radprof = QtGui.QLabel('radial profile', frame_radprof)
+        hbox_radprof_lbl = QtGui.QHBoxLayout()
+        hbox_radprof_lbl.addWidget(label_radprof)
+        hbox_radprof_lbl.addStretch(1)
+        layout_radprof.addLayout(hbox_radprof_lbl)
+        
+        self.gui_radprof['rad_lbl'] = QtGui.QLabel('r_max, dr, sigma: (opt.)', frame_radprof)
+        self.gui_radprof['rad_txt'] = QtGui.QLineEdit('', frame_radprof)
+        hbox_radprof_rad = QtGui.QHBoxLayout()
+        hbox_radprof_rad.addWidget(self.gui_radprof['rad_lbl'])
+        hbox_radprof_rad.addWidget(self.gui_radprof['rad_txt'])
+        layout_radprof.addLayout(hbox_radprof_rad)
+        
+        self.gui_radprof['crct_check'] = QtGui.QCheckBox('correct distortions', frame_radprof)
+        self.gui_radprof['mask_btn'] = QtGui.QPushButton('Mask', frame_radprof)
+        self.gui_radprof['mask_btn'].clicked.connect(self.on_mask)
+        hbox_radprof_dist = QtGui.QHBoxLayout()
+        hbox_radprof_dist.addWidget(self.gui_radprof['crct_check'])
+        hbox_radprof_dist.addWidget(self.gui_radprof['mask_btn'])
+        layout_radprof.addLayout(hbox_radprof_dist)
+        
+        self.gui_radprof['ext_btn'] = QtGui.QPushButton('Extract', frame_radprof)
+        self.gui_radprof['ext_btn'].clicked.connect(self.on_extractRadProf)
+        layout_radprof.addWidget(self.gui_radprof['ext_btn'])
         
         vbox_left = QtGui.QVBoxLayout()
         vbox_left.addWidget(frame_files)
         vbox_left.addWidget(frame_localmax)
         vbox_left.addWidget(frame_polar)
+        vbox_left.addWidget(frame_radprof)
         vbox_left.addStretch(1)
         
         
         self.plt_localmax = pg.PlotWidget()
         self.plt_localmax.setAspectLocked(True)
         self.plt_localmax.invertY(True)
+        
         
         self.plt_polar = pg.PlotWidget()
         self.plt_polar.setMouseEnabled(x=False, y=True)
@@ -221,7 +286,7 @@ class Main(QtGui.QMainWindow):
         
         self.mnwid.setLayout(hbox)
         
-        self.setGeometry(300,300,1024,768)
+        self.setGeometry(300,300,1024+512,1024)
         self.setWindowTitle('Evaluation of Ring Diffraction Patterns')
         
         self.show()
@@ -264,21 +329,22 @@ class Main(QtGui.QMainWindow):
             #data = np.swapaxes(data, 0,2)
             #data = np.swapaxes(data, 1,2)
             
-            self.data = np.copy(data)
-            self.dims = dims
+            self.data = np.copy(data[:,:,0])
+            self.dims = dims[0:2]
+            
+            min_data = np.min(self.data)
+            max_data = np.max(self.data)
+            
+            self.gui_localmax['min_slider'].setMinimum(min_data)
+            self.gui_localmax['min_slider'].setMaximum(max_data)
+            self.gui_localmax['min_slider'].setValue(min_data)
+            
+            self.gui_localmax['max_slider'].setMinimum(min_data)
+            self.gui_localmax['max_slider'].setMaximum(max_data)
+            self.gui_localmax['max_slider'].setValue(max_data)
             
             
-            self.gui_localmax['min_slider'].setMinimum(np.min(self.data))
-            self.gui_localmax['min_slider'].setMaximum(np.max(self.data))
-            
-            self.gui_localmax['max_slider'].setMinimum(np.min(self.data))
-            self.gui_localmax['max_slider'].setMaximum(np.max(self.data))
-            
-            
-            self.plt_localmax.clear()
-            self.plt_localmax_img = pg.ImageItem(self.data[:,:,0].astype('float64'), levels=(self.gui_localmax['min_slider'].value(), self.gui_localmax['max_slider'].value()))
-            self.plt_localmax_img.setZValue(-100)
-            self.plt_localmax.addItem(self.plt_localmax_img)
+            self.update_localmax()
             
         except: 
             self.gui_file['in_txt'].setText('')
@@ -308,89 +374,236 @@ class Main(QtGui.QMainWindow):
 
 
     def update_localmax(self):
+        '''
+        Update the localmax plot view.
+        '''
         
-        if not self.femd_in is None:
+        # update plot in local maxima
+        self.plt_localmax.clear()
         
-            # parse the input
-            try:
-                max_r = float(self.gui_localmax['txt_lmax_r'].text())
-                thresh = float(self.gui_localmax['txt_lmax_thresh'].text())
-                
-                cinit = self.gui_localmax['txt_lmax_cinit'].text().strip()
-                rrange = self.gui_localmax['txt_lmax_range'].text().strip()
-                
-                if cinit == '' and rrange == '':
-                    cinit = []
-                    rrange = []
-                else:
-                    cinit = [float(item.strip()) for item in cinit.split(',')]
-                    rrange = [float(item.strip()) for item in rrange.split(',')]
-                    assert(len(cinit)==2 and len(rrange)==2)
-                
-            except:
-                raise TypeError('Bad input to local maxima')
-            
-            
-            # update settings
-            self.settings['lmax_r'] = max_r
-            self.settings['lmax_thresh'] = thresh
-            self.settings['lmax_cinit'] = cinit
-            self.settings['lmax_range'] = rrange
-            
-            # confine data to current image
-            data = np.copy(self.data[:,:,0])
-
-            # find local max
-            points = emt.algo.local_max.local_max(data, self.settings['lmax_r'], self.settings['lmax_thresh'])
-            
-            
-            ## working in px for now
-            
-            
-            
-            # filter to single ring if input provided
-            if (len(self.settings['lmax_cinit'])==2 and len(self.settings['lmax_range'])==2):
-                points = emt.algo.distortion.filter_ring(points, self.settings['lmax_cinit'], self.settings['lmax_range'])
+        if not self.data is None:
         
-            # save points in main
-            self.points = np.copy(points)
-        
-            # update plot in local maxima
-            self.plt_localmax.clear()
-            
-            self.plt_localmax.plot(points[:,1], points[:,0], pen=None, symbol='o', symbolPen=(255,0,0), symbolBrush=None)
-            
-            self.plt_localmax_img = pg.ImageItem(self.data[:,:,0].astype('float64'), levels=(self.gui_localmax['min_slider'].value(), self.gui_localmax['max_slider'].value()))
+            # set axis
+            axis1 = self.plt_localmax.getAxis('bottom')
+            axis1.setLabel(self.dims[0][1], self.dims[0][2])
+            axis2 = self.plt_localmax.getAxis('left')
+            axis2.setLabel(self.dims[1][1], self.dims[1][2])
+           
+            # plot image
+            self.plt_localmax_img = pg.ImageItem(self.data.astype('float64'), levels=(self.gui_localmax['min_slider'].value(), self.gui_localmax['max_slider'].value()))
             self.plt_localmax_img.setZValue(-100)
+            self.plt_localmax_img.setRect(pg.QtCore.QRectF( self.dims[0][0][0],self.dims[1][0][0],self.dims[0][0][-1]-self.dims[0][0][0],self.dims[1][0][-1]-self.dims[1][0][0]))
             self.plt_localmax.addItem(self.plt_localmax_img)
             
-            #img.setRect(pg.QtCore.QRectF(0,0,2047,2047))
+            if not self.points is None:
             
+                # draw points
+                self.plt_localmax.plot(self.points[:,0], self.points[:,1], pen=None, symbol='o', symbolPen=(255,0,0), symbolBrush=None)
 
-            #import pdb;pdb.set_trace()
 
 
+    def on_localmax(self):
+        '''
+        Calculate local maxima.
+        '''
+    
+        # parse the input
+        try:
+            max_r = float(self.gui_localmax['txt_lmax_r'].text())
+            thresh = float(self.gui_localmax['txt_lmax_thresh'].text())
+                
+            cinit = self.gui_localmax['txt_lmax_cinit'].text().strip()
+            rrange = self.gui_localmax['txt_lmax_range'].text().strip()
+                
+            if cinit == '' and rrange == '':
+                cinit = []
+                rrange = []
+            else:
+                cinit = [float(item.strip()) for item in cinit.split(',')]
+                rrange = [float(item.strip()) for item in rrange.split(',')]
+                assert(len(cinit)==2 and len(rrange)==2)
+                
+        except:
+            raise TypeError('Bad input to local maxima')
+
+        # update settings
+        self.settings['lmax_r'] = max_r
+        self.settings['lmax_thresh'] = thresh
+        self.settings['lmax_cinit'] = cinit
+        self.settings['lmax_range'] = rrange
+            
+        # find local max
+        points = emt.algo.local_max.local_max(self.data, self.settings['lmax_r'], self.settings['lmax_thresh'])
+        points = emt.algo.local_max.points_todim(points, self.dims)
+                
+        # filter to single ring if input provided
+        if (len(self.settings['lmax_cinit'])==2 and len(self.settings['lmax_range'])==2):
+            points = emt.algo.distortion.filter_ring(points, self.settings['lmax_cinit'], self.settings['lmax_range'])
+        
+        # save points in main
+        self.points = points
+        
+        # update localmax view
+        self.update_localmax() 
+            
+            
     
     def update_polar(self):
-    
-
-        points_plr = emt.algo.distortion.points_topolar(self.points, self.settings['lmax_cinit'])
+        '''
+        Update the polar plot depending on which data is present.
+        '''
         
-        ## update plot in polar plot
         self.plt_polar.clear()
         
-        # horizontal mean line
-        self.plt_polar.plot( [-np.pi, np.pi], [np.mean(points_plr[:,0]), np.mean(points_plr[:,0])], pen=pg.mkPen('k', style=QtCore.Qt.DashLine))
+        if not self.center is None:
+            # update center in left column
+            self.gui_polar['center_lbl'].setText('center: ({:.3f}, {:.3f})'.format(self.center[0], self.center[1]))
         
-        self.plt_polar.plot(points_plr[:,1], points_plr[:,0], pen=None, symbol='x', symbolPen=(255,0,0), symbolBrush=None)
+            if not self.points is None:
+                points_plr = emt.algo.distortion.points_topolar(self.points, self.center)
         
+                # horizontal mean line
+                self.plt_polar.plot( [-np.pi, np.pi], [np.mean(points_plr[:,0]), np.mean(points_plr[:,0])], pen=pg.mkPen('k', style=QtCore.Qt.DashLine))
+                
+                # uncorrected radial positions
+                self.plt_polar.plot(points_plr[:,1], points_plr[:,0], pen=None, symbol='x', symbolPen=(255,0,0), symbolBrush=None)
         
-        #axis1.setRange(-np.pi, np.pi)
-        
-       
-        
-        #self.plt_polar.setXRange(-np.pi, np.pi)
+                if not self.dists is None:
+                    
+                    xpl_ell = np.linspace(-np.pi, np.pi, 200)
+                    # single distortions
+                    for i in range(len(self.settings['ns'])):
+                        self.plt_polar.plot( xpl_ell, self.dists[0]*emt.algo.distortion.rad_dis(xpl_ell, self.dists[i*2+1], self.dists[i*2+2], self.settings['ns'][i]), pen=pg.mkPen('m', style=QtCore.Qt.DashLine) )
+                    
+                    # sum of distortions
+                    sum_dists = self.dists[0]*np.ones(xpl_ell.shape)
+                    for i in range(len(self.settings['ns'])):
+                        sum_dists *= emt.algo.distortion.rad_dis( xpl_ell, self.dists[i*2+1], self.dists[i*2+2], self.settings['ns'][i])
+                    self.plt_polar.plot( xpl_ell, sum_dists, pen=(0,0,255))
 
+                    # corrected radial positions
+                    points_plr_corr = np.copy(points_plr)
+                    for i in range(len(self.settings['ns'])):
+                        points_plr_corr[:,0] /= emt.algo.distortion.rad_dis(points_plr_corr[:,1], self.dists[i*2+1], self.dists[i*2+2], self.settings['ns'][i])
+                    
+                    self.plt_polar.plot( points_plr_corr[:,1], points_plr_corr[:,0], pen=None, symbol='x', symbolPen=(0,180,0), symbolBrush=None) 
+
+
+
+
+
+    def on_copyCenter(self):
+        
+        try:
+            cinit = self.gui_localmax['txt_lmax_cinit'].text().strip()   
+            if cinit == '':
+                cinit = []
+            else:
+                cinit = [float(item.strip()) for item in cinit.split(',')]
+                assert(len(cinit)==2)
+        except:
+            raise TypeError('Bad input to local maxima')
+            
+        if len(cinit) == 0:
+            print('No initial guess given.')
+        else:
+            self.settings['lmax_cinit'] = cinit
+            self.center=np.array(cinit)
+
+        self.update_polar()
+        
+
+
+    def on_optimizeCenter(self):
+    
+        center = emt.algo.distortion.optimize_center(self.points, self.center)
+        self.center= center
+        
+        self.update_polar()
+        
+        
+        
+    def on_fitDist(self):
+        
+        try:
+            ns = self.gui_polar['dist_txt'].text().strip()
+            if ns == '':
+                ns = []
+            else:
+                ns = [int(item.strip()) for item in ns.split(',')]
+        except:
+            raise TypeError('Bad input in ')
+            
+        # update setting
+        self.settings['ns'] = ns 
+       
+        # run optimization
+        if len(ns) >= 1:
+            points_plr = emt.algo.distortion.points_topolar(self.points, self.center)
+            dists = emt.algo.distortion.optimize_distortion(points_plr, self.settings['ns'])
+            
+            self.dists = dists
+            
+        self.update_polar()
+        
+        
+    
+    def update_RadProf(self):
+        
+        self.plt_radprof.clear()
+        
+        if not self.radprof is None:
+            
+            self.plt_radprof.plot(self.radprof[:,0], self.radprof[:,1], pen=(255,0,0))
+        
+        
+    
+    def on_extractRadProf(self):
+        '''
+        Extract the radial profile from the diffraction pattern.
+        '''
+        
+        try:
+            pars = self.gui_radprof['rad_txt'].text().strip()
+            if pars == '':
+                pars = []
+            else:
+                pars = [float(item.strip()) for item in pars.split(',')]
+                assert(len(pars)==3)
+        except:
+            raise TypeError('Bad input in ')
+        
+        
+        if len(pars) == 0:
+            self.settings['rad_rmax'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])*np.min(self.data.shape)/2.0
+            self.settings['rad_dr'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])/10.
+            self.settings['rad_sigma'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])
+        else:
+            self.settings['rad_rmax'] = pars[0]
+            self.settings['rad_dr'] = pars[1]
+            self.settings['rad_sigma'] = pars[2]
+        
+        
+        # get the polar coordinate system
+        if self.gui_radprof['crct_check'].isChecked():
+            rs, thes = emt.algo.radial_profile.calc_polarcoords( self.center, self.dims, self.settings['ns'], self.dists )
+        else:
+            rs, thes = emt.algo.radial_profile.calc_polarcoords( self.center, self.dims )
+        
+        # get the radial profile
+        R, I = emt.algo.radial_profile.calc_radialprofile( self.data, rs, self.settings['rad_rmax'], self.settings['rad_dr'], self.settings['rad_sigma'] )
+        
+        # save in main
+        self.radprof = np.array([R,I]).transpose()
+    
+        # update the plot
+        self.update_RadProf()
+    
+        import pdb;pdb.set_trace()
+    
+    
+    def on_mask(self):
+        pass
 
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)

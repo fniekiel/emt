@@ -45,7 +45,7 @@ def local_max(img, r, thresh):
     if sel.any():  
         # retrieve and return points
         points = np.argwhere(sel)
-        points = np.roll(points, 1, axis=1)
+        #points = np.roll(points, 1, axis=1)
         
         return points
     else:
