@@ -42,6 +42,7 @@ class Main(QtGui.QMainWindow):
         self.dists = None
         self.radprof = None
         self.back_params = None
+        self.res = None
         
         self.initUI()
         
@@ -265,7 +266,12 @@ class Main(QtGui.QMainWindow):
         
         self.gui_radprof['fit_btn'] = QtGui.QPushButton('Fit Radial Profile', frame_radprof)
         self.gui_radprof['fit_btn'].clicked.connect(self.on_fitRadProf)
-        layout_radprof.addWidget(self.gui_radprof['fit_btn'])
+        self.gui_radprof['fit_check'] = QtGui.QCheckBox('Plot Fit', frame_radprof)
+        self.gui_radprof['fit_check'].stateChanged.connect(self.update_RadProf)
+        hbox_radprof_fitbtns2 = QtGui.QHBoxLayout()
+        hbox_radprof_fitbtns2.addWidget(self.gui_radprof['fit_btn'])
+        hbox_radprof_fitbtns2.addWidget(self.gui_radprof['fit_check'])
+        layout_radprof.addLayout(hbox_radprof_fitbtns2)
         
         
         vbox_left = QtGui.QVBoxLayout()
@@ -609,6 +615,12 @@ class Main(QtGui.QMainWindow):
             # rad profile has been calculated
             R = np.copy(self.radprof[:,0])
             I = np.copy(self.radprof[:,1])
+            
+            # cut to fitrange
+            if (not len(self.settings['fit_rrange']) == 0) and (self.gui_radprof['fit_check'].isChecked()):
+                sel = (R>=self.settings['fit_rrange'][0])*(R<=self.settings['fit_rrange'][1])
+                I = I[sel]
+                R = R[sel]
         
             back = None
         
@@ -633,9 +645,20 @@ class Main(QtGui.QMainWindow):
             if self.gui_radprof['back_check'].isChecked() and not back is None:
                 # subtract background
                 I -= back
-                        
-            #import pdb;pdb.set_trace()            
-                        
+                
+            
+            if (not self.res is None) and (self.gui_radprof['fit_check'].isChecked()):
+            
+                # draw fit results
+                fitsum = emt.algo.math.sum_functions( R, self.settings['fit_funcs'], self.res )
+                self.plt_radprof.plot(R, fitsum, pen=(0,0,255))
+                
+                i = 0
+                for n in range(len(self.settings['fit_funcs'])):
+                    self.plt_radprof.plot(R, emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][0](R, self.res[i:i+emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][1]]), pen=(0,180,0)) 
+                    i += emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][1]
+    
+            # plot radial profile
             self.plt_radprof.plot(R, I, pen=(255,0,0))
         
         
@@ -653,10 +676,18 @@ class Main(QtGui.QMainWindow):
             else:
                 pars = [float(item.strip()) for item in pars.split(',')]
                 assert(len(pars)==3)
+                
+            fitrange = self.gui_radprof['fit_range_txt'].text().strip()
+            if fitrange == '':
+                fitrange = []
+            else:
+                fitrange = [float(item.strip()) for item in fitrange.split(',')]
+                assert(len(fitrange)==2)
+                   
         except:
             raise TypeError('Bad input in ')
         
-        
+        # save settings
         if len(pars) == 0:
             self.settings['rad_rmax'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])*np.min(self.data.shape)/2.0
             self.settings['rad_dr'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])/10.
@@ -666,6 +697,7 @@ class Main(QtGui.QMainWindow):
             self.settings['rad_dr'] = pars[1]
             self.settings['rad_sigma'] = pars[2]
         
+        self.settings['fit_rrange'] = fitrange
         
         # get the polar coordinate system
         if self.gui_radprof['crct_check'].isChecked():
@@ -775,9 +807,49 @@ class Main(QtGui.QMainWindow):
         except:
             raise TypeError('Bad input to fit radial profile.')
         
+        
         # save settings
-        if not len(fitrange) == 0:    
-            self.settings['fit_rrange'] = fitrange
+        self.settings['fit_rrange'] = fitrange
+        self.settings['fit_funcs'] = funcs
+        self.settings['fit_init'] = init_guess
+        
+        
+        if not self.radprof is None:
+        
+            # rad profile has been calculated
+            R = np.copy(self.radprof[:,0])
+            I = np.copy(self.radprof[:,1])
+            
+            # cut to fitrange
+            if not len(self.settings['fit_rrange']) == 0:
+                sel = (R>=self.settings['fit_rrange'][0])*(R<=self.settings['fit_rrange'][1])
+                I = I[sel]
+                R = R[sel]
+        
+            back = None
+        
+            if (not self.back_params is None) and (self.gui_radprof['back_check'].isChecked()):
+            
+                # calulate background
+                fit_R = np.array([])
+                fit_I = np.array([])
+                for xpoint in self.settings['back_xs']:
+                    ix = np.where( np.abs(R-xpoint) <= self.settings['back_xswidth'])
+                    fit_R = np.append(fit_R, R[ix])
+                    fit_I = np.append(fit_I, I[ix])
+                       
+                back = emt.algo.math.sum_functions( R, ('const', 'powlaw'), self.back_params )
+         
+                I -= back
+ 
+ 
+            res = emt.algo.radial_profile.fit_radialprofile( R, I, self.settings['fit_funcs'], self.settings['fit_init'], 10000 )
+            
+            self.res = res          
+                        
+        
+        
+        
         
         
         self.update_RadProf()
