@@ -54,59 +54,39 @@ class Main(QtGui.QMainWindow):
         
         self.setCentralWidget(self.mnwid)
         
+        
+        
         ## file informations
-        frame_files = QtGui.QFrame(self.mnwid)
-        frame_files.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
+        frame_files = QtGui.QGroupBox('Files', self.mnwid)
         layout_files = QtGui.QVBoxLayout(frame_files)
-        
-        label_files = QtGui.QLabel('files', frame_files)
-        
-        hbox_files = QtGui.QHBoxLayout()
-        hbox_files.addWidget(label_files)
-        hbox_files.addStretch(1)
         
         self.gui_file['out_btn'] = QtGui.QPushButton('Open', frame_files)
         self.gui_file['out_btn'].clicked.connect(self.on_open_outfile)
-        
         self.gui_file['out_lbl'] = QtGui.QLabel( 'evaluation file: ', frame_files )
-
         self.gui_file['out_txt'] = QtGui.QLineEdit( '', frame_files )
         self.gui_file['out_txt'].setReadOnly(True)
-
         hbox_outfile = QtGui.QHBoxLayout()
         hbox_outfile.addWidget(self.gui_file['out_lbl'])        
         hbox_outfile.addWidget(self.gui_file['out_txt'])
         hbox_outfile.addWidget(self.gui_file['out_btn'])
+        layout_files.addLayout(hbox_outfile)
 
         self.gui_file['in_btn'] = QtGui.QPushButton('Open', frame_files)
         self.gui_file['in_btn'].clicked.connect(self.on_open_infile)
-        
         self.gui_file['in_lbl'] = QtGui.QLabel( 'input emd file: ', frame_files )
-
         self.gui_file['in_txt'] = QtGui.QLineEdit( '', frame_files )
         self.gui_file['in_txt'].setReadOnly(True)
-
         hbox_infile = QtGui.QHBoxLayout()
         hbox_infile.addWidget(self.gui_file['in_lbl'])        
         hbox_infile.addWidget(self.gui_file['in_txt'])
         hbox_infile.addWidget(self.gui_file['in_btn'])
-        
-        layout_files.addLayout(hbox_files)
-        layout_files.addLayout(hbox_outfile)
         layout_files.addLayout(hbox_infile)
         
 
         ## local maxima stuff
-        frame_localmax = QtGui.QFrame(self.mnwid)
-        frame_localmax.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
+        frame_localmax = QtGui.QGroupBox('Local Maxima', self.mnwid)
         layout_localmax = QtGui.QVBoxLayout(frame_localmax)
         
-        label_localmax = QtGui.QLabel('local maxima', frame_localmax)
-        hbox_localmax_lbl = QtGui.QHBoxLayout()
-        hbox_localmax_lbl.addWidget(label_localmax)
-        hbox_localmax_lbl.addStretch(1)
-        layout_localmax.addLayout(hbox_localmax_lbl)
-
         self.gui_localmax['lbl_lmax_r'] = QtGui.QLabel('local radius: ', frame_localmax)
         self.gui_localmax['txt_lmax_r'] = QtGui.QLineEdit( '', frame_localmax)
         hbox_lmax_r = QtGui.QHBoxLayout()
@@ -172,15 +152,8 @@ class Main(QtGui.QMainWindow):
 
 
         ## polar plot stuff
-        frame_polar = QtGui.QFrame(self.mnwid)
-        frame_polar.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
+        frame_polar = QtGui.QGroupBox('Polar Plot',self.mnwid)
         layout_polar = QtGui.QVBoxLayout(frame_polar)
-        
-        label_polar = QtGui.QLabel('polar plot', frame_polar)
-        hbox_polar_lbl = QtGui.QHBoxLayout()
-        hbox_polar_lbl.addWidget(label_polar)
-        hbox_polar_lbl.addStretch(1)
-        layout_polar.addLayout(hbox_polar_lbl) 
         
         self.gui_polar['center_lbl'] = QtGui.QLabel('center: ', frame_polar)
         self.gui_polar['cencpy_btn'] = QtGui.QPushButton('Copy Init', frame_polar)
@@ -211,15 +184,8 @@ class Main(QtGui.QMainWindow):
         
         
         ## radial profile stuff
-        frame_radprof = QtGui.QFrame(self.mnwid)
-        frame_radprof.setFrameStyle(QtGui.QFrame.Panel | QtGui.QFrame.Raised)
+        frame_radprof = QtGui.QGroupBox('Radial Profile', self.mnwid)
         layout_radprof = QtGui.QVBoxLayout(frame_radprof)
-        
-        label_radprof = QtGui.QLabel('radial profile', frame_radprof)
-        hbox_radprof_lbl = QtGui.QHBoxLayout()
-        hbox_radprof_lbl.addWidget(label_radprof)
-        hbox_radprof_lbl.addStretch(1)
-        layout_radprof.addLayout(hbox_radprof_lbl)
         
         self.gui_radprof['rad_lbl'] = QtGui.QLabel('r_max, dr, sigma: (opt.)', frame_radprof)
         self.gui_radprof['rad_txt'] = QtGui.QLineEdit('', frame_radprof)
@@ -301,10 +267,26 @@ class Main(QtGui.QMainWindow):
         self.gui_radprof['fit_btn'].clicked.connect(self.on_fitRadProf)
         layout_radprof.addWidget(self.gui_radprof['fit_btn'])
         
+        
         vbox_left = QtGui.QVBoxLayout()
         vbox_left.addWidget(frame_files)
+        
+        sep1 = QtGui.QFrame(self.mnwid)
+        sep1.setFrameStyle(QtGui.QFrame.HLine | QtGui.QFrame.Sunken)
+        vbox_left.addWidget(sep1)
+        
         vbox_left.addWidget(frame_localmax)
+        
+        sep2 = QtGui.QFrame(self.mnwid)
+        sep2.setFrameStyle(QtGui.QFrame.HLine | QtGui.QFrame.Sunken)
+        vbox_left.addWidget(sep2)
+        
         vbox_left.addWidget(frame_polar)
+        
+        sep3 = QtGui.QFrame(self.mnwid)
+        sep3.setFrameStyle(QtGui.QFrame.HLine | QtGui.QFrame.Sunken)
+        vbox_left.addWidget(sep3)
+        
         vbox_left.addWidget(frame_radprof)
         vbox_left.addStretch(1)
         
