@@ -276,15 +276,26 @@ class Main(QtGui.QMainWindow):
         hbox_radprof_backbtn.addWidget(self.gui_radprof['back_check'])
         layout_radprof.addLayout(hbox_radprof_backbtn)
         
-        self.gui_radprof['fit_tbl'] = QtGui.QTableWidget(4,2, frame_radprof)
+        self.gui_radprof['fit_tbl'] = QtGui.QTableWidget(1,2, frame_radprof)
+        self.gui_radprof['fit_tbl'].setHorizontalHeaderLabels(['function', 'initial parameters'])
+        self.gui_radprof['fit_tbl'].horizontalHeader().setStretchLastSection(True)
         layout_radprof.addWidget(self.gui_radprof['fit_tbl'])
         
         self.gui_radprof['fit_add_btn'] = QtGui.QPushButton('Add', frame_radprof)
+        self.gui_radprof['fit_add_btn'].clicked.connect(self.on_addFit)
         self.gui_radprof['fit_del_btn'] = QtGui.QPushButton('Delete', frame_radprof)
+        self.gui_radprof['fit_del_btn'].clicked.connect(self.on_delFit)
         hbox_radprof_fitbtns = QtGui.QHBoxLayout()
         hbox_radprof_fitbtns.addWidget(self.gui_radprof['fit_add_btn'])
         hbox_radprof_fitbtns.addWidget(self.gui_radprof['fit_del_btn'])
         layout_radprof.addLayout(hbox_radprof_fitbtns)
+        
+        self.gui_radprof['fit_range_lbl'] = QtGui.QLabel('fit range: ', frame_radprof)
+        self.gui_radprof['fit_range_txt'] = QtGui.QLineEdit('', frame_radprof)
+        hbox_radprof_fitrange = QtGui.QHBoxLayout()
+        hbox_radprof_fitrange.addWidget(self.gui_radprof['fit_range_lbl'])
+        hbox_radprof_fitrange.addWidget(self.gui_radprof['fit_range_txt'])
+        layout_radprof.addLayout(hbox_radprof_fitrange)
         
         self.gui_radprof['fit_btn'] = QtGui.QPushButton('Fit Radial Profile', frame_radprof)
         self.gui_radprof['fit_btn'].clicked.connect(self.on_fitRadProf)
@@ -340,7 +351,7 @@ class Main(QtGui.QMainWindow):
         
         self.mnwid.setLayout(hbox)
         
-        self.setGeometry(300,300,1500,1024)
+        self.setGeometry(300,300,1500,1100)
         self.setWindowTitle('Evaluation of Ring Diffraction Patterns')
         
         self.show()
@@ -720,7 +731,7 @@ class Main(QtGui.QMainWindow):
                 back_init = [float(item.strip()) for item in back_init.split(',')]
                 assert(len(back_init) == 3)
         except:
-            raise TypeError('Bad input to subtract background')
+            raise TypeError('Bad input to subtract background.')
             
         # save settings
         self.settings['back_xs'] = fitxs
@@ -752,7 +763,61 @@ class Main(QtGui.QMainWindow):
    
    
     def on_fitRadProf(self):
-        pass
+        '''
+        Fit the radial profile with peak functions.
+        '''
+        
+        # parse the input
+        try:
+            fitrange = self.gui_radprof['fit_range_txt'].text().strip()
+            
+            if fitrange == '':
+                fitrange = []
+            else:
+                fitrange = [float(item.strip()) for item in fitrange.split(',')]
+                assert(len(fitrange)==2)
+                
+            funcs = []
+            init_guess = []    
+               
+            for n in range(self.gui_radprof['fit_tbl'].rowCount()):
+                label = self.gui_radprof['fit_tbl'].item(n,0).text()
+                funcs.append(label)
+
+                initparams = self.gui_radprof['fit_tbl'].item(n,1).text()
+                initparams = [float(item.strip()) for item in initparams.split(',')]
+                assert(len(initparams)==emt.algo.math.lkp_funcs[label][1])  
+                for param in initparams:
+                    init_guess.append(param)        
+        
+        except:
+            raise TypeError('Bad input to fit radial profile.')
+        
+        # save settings
+        if not len(fitrange) == 0:    
+            self.settings['fit_rrange'] = fitrange
+        
+        
+        self.update_RadProf()
+        
+
+
+    def on_addFit(self):
+        self.gui_radprof['fit_tbl'].insertRow(self.gui_radprof['fit_tbl'].rowCount())
+    
+    
+    def on_delFit(self):
+    
+        row_to_delete = []
+    
+        for item in self.gui_radprof['fit_tbl'].selectedIndexes():
+            this_row = item.row()
+            if not this_row in row_to_delete:
+                row_to_delete.append(this_row)
+        
+        for row in sorted(row_to_delete)[::-1]:
+            self.gui_radprof['fit_tbl'].removeRow(row)
+    
     
     
 if __name__ == '__main__':
