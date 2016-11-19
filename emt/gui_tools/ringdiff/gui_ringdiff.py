@@ -331,9 +331,10 @@ class Main(QtGui.QMainWindow):
         #hbox.addStretch(1)
         
         self.right = QtGui.QTabWidget(self.mnwid)
-        self.right.addTab(self.plt_localmax, 'Local Maxima')
-        self.right.addTab(self.plt_polar, 'Polar Plot')
-        self.right.addTab(self.plt_radprof, 'Radial Profile')
+        self.right_tabs = {}
+        self.right_tabs['localmax'] = self.right.addTab(self.plt_localmax, 'Local Maxima')
+        self.right_tabs['polar'] = self.right.addTab(self.plt_polar, 'Polar Plot')
+        self.right_tabs['radprof'] = self.right.addTab(self.plt_radprof, 'Radial Profile')
         #hbox_right = QtGui.QHBoxLayout(self.right)
         #hbox_right.addWidget(self.imv_localmax)
         
@@ -496,7 +497,9 @@ class Main(QtGui.QMainWindow):
                 # draw points
                 self.plt_localmax.plot(self.points[:,0], self.points[:,1], pen=None, symbol='o', symbolPen=(255,0,0), symbolBrush=None)
 
+        self.right.setCurrentWidget( self.right.widget(self.right_tabs['localmax']))
 
+        
 
     def on_localmax(self):
         '''
@@ -589,7 +592,7 @@ class Main(QtGui.QMainWindow):
                     
                     self.plt_polar.plot( points_plr_corr[:,1], points_plr_corr[:,0], pen=None, symbol='x', symbolPen=(0,180,0), symbolBrush=None) 
 
-
+        self.right.setCurrentWidget( self.right.widget(self.right_tabs['polar']))
 
 
 
@@ -704,6 +707,7 @@ class Main(QtGui.QMainWindow):
             # plot radial profile
             self.plt_radprof.plot(R, I, pen=(255,0,0))
         
+        self.right.setCurrentWidget( self.right.widget(self.right_tabs['radprof']))
         
         
     
