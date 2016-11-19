@@ -36,6 +36,25 @@ dummie_settings = { 'lmax_r': 1,
                     'fit_maxfev':10
                   }
 
+min_dummie_settings = { 'lmax_r': 1,
+                        'lmax_thresh': 1,
+                        'lmax_cinit': (1,1),
+                        'lmax_range': (1.,2.),
+                        'plt_imgminmax': None,
+                        'ns': (1,),
+                        'rad_rmax': None,
+                        'rad_dr': None,
+                        'rad_sigma': None,
+                        'mask': None,
+                        'fit_rrange': (1.0, 2.0),
+                        'back_xs': (1.0, 2.0, 3.0),
+                        'back_xswidth': 0.1,
+                        'back_init': (1.0, 1.0, 1.0),
+                        'fit_funcs': ('voigt',),
+                        'fit_init': (1.0, 1.0, 1.0, 1.0),
+                        'fit_maxfev': None
+                    }
+
 def get_settings( parent ):
     '''
     Get settings for radial profile evaluation.

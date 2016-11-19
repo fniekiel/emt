@@ -5,11 +5,14 @@ GUI tool to evaluate ring diffraction patterns.
 
 import sys
 import numpy as np
+import os
+import copy
 
 import emt.io.emd
 import emt.algo.local_max
 import emt.algo.distortion
 import emt.algo.radial_profile
+import emt.eva.ring_diff
 
 from PySide import QtGui, QtCore
 
@@ -58,19 +61,8 @@ class Main(QtGui.QMainWindow):
         
         
         ## file informations
-        frame_files = QtGui.QGroupBox('Files', self.mnwid)
+        frame_files = QtGui.QGroupBox('Input', self.mnwid)
         layout_files = QtGui.QVBoxLayout(frame_files)
-        
-        self.gui_file['out_btn'] = QtGui.QPushButton('Open', frame_files)
-        self.gui_file['out_btn'].clicked.connect(self.on_open_outfile)
-        self.gui_file['out_lbl'] = QtGui.QLabel( 'evaluation file: ', frame_files )
-        self.gui_file['out_txt'] = QtGui.QLineEdit( '', frame_files )
-        self.gui_file['out_txt'].setReadOnly(True)
-        hbox_outfile = QtGui.QHBoxLayout()
-        hbox_outfile.addWidget(self.gui_file['out_lbl'])        
-        hbox_outfile.addWidget(self.gui_file['out_txt'])
-        hbox_outfile.addWidget(self.gui_file['out_btn'])
-        layout_files.addLayout(hbox_outfile)
 
         self.gui_file['in_btn'] = QtGui.QPushButton('Open', frame_files)
         self.gui_file['in_btn'].clicked.connect(self.on_open_infile)
@@ -274,6 +266,15 @@ class Main(QtGui.QMainWindow):
         layout_radprof.addLayout(hbox_radprof_fitbtns2)
         
         
+        ## Output stuff
+        frame_filesout = QtGui.QGroupBox('Output', self.mnwid)
+        layout_filesout = QtGui.QVBoxLayout(frame_filesout)
+        
+        self.gui_file['out_btn'] = QtGui.QPushButton('Save to EMD', frame_filesout)
+        self.gui_file['out_btn'].clicked.connect(self.on_saveEMDFile)
+        layout_filesout.addWidget(self.gui_file['out_btn'])
+        
+        
         vbox_left = QtGui.QVBoxLayout()
         vbox_left.addWidget(frame_files)
         
@@ -294,8 +295,14 @@ class Main(QtGui.QMainWindow):
         vbox_left.addWidget(sep3)
         
         vbox_left.addWidget(frame_radprof)
-        vbox_left.addStretch(1)
         
+        sep4 = QtGui.QFrame(self.mnwid)
+        sep4.setFrameStyle(QtGui.QFrame.HLine | QtGui.QFrame.Sunken)
+        vbox_left.addWidget(sep4)
+        
+        vbox_left.addWidget(frame_filesout)
+        
+        vbox_left.addStretch(1)
         
         self.plt_localmax = pg.PlotWidget()
         self.plt_localmax.setAspectLocked(True)
@@ -317,6 +324,9 @@ class Main(QtGui.QMainWindow):
         hbox_left = QtGui.QHBoxLayout(left)
         hbox_left.addLayout(vbox_left)
         
+        left_scroll = QtGui.QScrollArea()
+        left_scroll.setWidget(left)
+        
         #hbox.addWidget(self.imv_localmax)
         #hbox.addStretch(1)
         
@@ -328,7 +338,7 @@ class Main(QtGui.QMainWindow):
         #hbox_right.addWidget(self.imv_localmax)
         
         splitter = QtGui.QSplitter(QtCore.Qt.Horizontal)
-        splitter.addWidget(left)
+        splitter.addWidget(left_scroll)
         splitter.addWidget(self.right)
         splitter.setStretchFactor(0, 0.2)
         splitter.setStretchFactor(1, 1.0)   
@@ -351,20 +361,6 @@ class Main(QtGui.QMainWindow):
         if e.key() == QtCore.Qt.Key_Escape:
             self.close()
             
-            
-            
-    def on_open_outfile(self):
-        '''
-        Open or create an EMD file to hold the evaluation.
-        '''
-        fname, _ = QtGui.QFileDialog.getOpenFileName(self, 'Open/create EMD file', filter='EMD files (*.emd);;All files (*.*)')
-        try:
-            
-            self.gui_file['out_txt'].setText(fname)
-        except: 
-            self.gui_file['out_txt'].setText('')
-            pass
-    
             
             
     def on_open_infile(self):
@@ -403,6 +399,53 @@ class Main(QtGui.QMainWindow):
             self.gui_file['in_txt'].setText('')
             raise
     
+    
+    
+    def on_saveEMDFile(self):
+        '''
+        Open or create an EMD file to hold the evaluation.
+        '''
+        fname, _ = QtGui.QFileDialog.getSaveFileName(self, 'Save to EMD file', filter='EMD files (*.emd);;All files (*.*)')
+        
+        # create/overwrite outfile
+        if os.path.isfile(fname):
+            os.remove(fname)
+        femd = emt.io.emd.fileEMD(fname)            
+            
+        if 'evaluation' in femd.file_hdl:
+            grp_eva = femd.file_hdl['evaluation']
+        else:
+            grp_eva = femd.file_hdl.create_group('evaluation')
+        
+        hdl = emt.eva.ring_diff.put_sglgroup(grp_eva, self.femd_in.file_hdl.filename.split('/')[-1], self.femd_in.list_emds[0])
+        
+        # insert the result datasets        
+        if not self.radprof is None:
+            femd.put_emdgroup('radial_profile', self.radprof[:,1], ( (self.radprof[:,0], 'radial distance', self.dims[0][2]), ), parent=hdl, overwrite=True)
+        if not self.res is None:
+            femd.put_emdgroup('fit_results', self.res, ( ( np.array(range(self.res.shape[0])), 'parameters', '[]'), ), parent=hdl, overwrite=True)
+        if not self.center is None:
+            femd.put_emdgroup('centers', self.center, ( ( np.array(range(2)), 'dimension', self.dims[0][2]), ), parent=hdl, overwrite=True) 
+        if not self.dists is None:
+            femd.put_emdgroup('distortions', self.dists, ( ( np.array(range(self.dists.shape[0])), 'parameters', '[]'), ), parent=hdl, overwrite=True)
+        if not self.back_params is None:
+            femd.put_emdgroup('back_results', self.back_params, ( ( np.array(range(self.back_params.shape[0])), 'background parameters', '[]'), ), parent=hdl, overwrite=True)
+
+        # save settings 
+        # make them valid
+        # create a copy of settings to decouple
+        mysettings = copy.deepcopy(self.settings)
+        for key in emt.eva.ring_diff.min_dummie_settings:
+            if not key in mysettings:
+                mysettings[key] = emt.eva.ring_diff.min_dummie_settings[key]
+        
+        import pdb;pdb.set_trace()
+        
+        emt.eva.ring_diff.put_settings( hdl, mysettings )
+        
+        # save a comment
+        femd.put_comment( 'Ring diffraction evaluation saved from gui_ringdiff.' )
+
     
     
     def on_intensitySlider(self):
@@ -847,11 +890,6 @@ class Main(QtGui.QMainWindow):
             
             self.res = res          
                         
-        
-        
-        
-        
-        
         self.update_RadProf()
         
 
