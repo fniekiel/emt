@@ -31,12 +31,19 @@ class Main(QtGui.QMainWindow):
         self.gui_localmax = {}
         self.gui_polar = {}
         self.gui_radprof = {}
+        self.gui_run = {}
         
         self.plt_localmax = None
         self.plt_localmax_img = None
         self.plt_polar = None
         self.plt_radprof = None
         
+        self.reset()
+        
+        self.initUI()
+        
+        
+    def reset(self):
         self.data = None
         self.dims = None
         self.settings = {}
@@ -46,8 +53,6 @@ class Main(QtGui.QMainWindow):
         self.radprof = None
         self.back_params = None
         self.res = None
-        
-        self.initUI()
         
     
     def initUI(self):
@@ -74,6 +79,18 @@ class Main(QtGui.QMainWindow):
         hbox_infile.addWidget(self.gui_file['in_txt'])
         hbox_infile.addWidget(self.gui_file['in_btn'])
         layout_files.addLayout(hbox_infile)
+        
+        self.gui_file['idx_lbl'] = QtGui.QLabel('index: ', frame_files)
+        self.gui_file['idx_slider'] = QtGui.QSlider(QtCore.Qt.Orientation.Horizontal, frame_files)
+        self.gui_file['idx_slider'].setMinimum(0)
+        self.gui_file['idx_slider'].setMaximum(0)
+        self.gui_file['idx_slider'].valueChanged.connect(self.on_indexSlider)
+        self.gui_file['idx_value'] = QtGui.QLabel('0', frame_files)
+        hbox_idx = QtGui.QHBoxLayout()
+        hbox_idx.addWidget(self.gui_file['idx_lbl'])
+        hbox_idx.addWidget(self.gui_file['idx_slider'])
+        hbox_idx.addWidget(self.gui_file['idx_value'])
+        layout_files.addLayout(hbox_idx)
         
 
         ## local maxima stuff
@@ -235,7 +252,7 @@ class Main(QtGui.QMainWindow):
         hbox_radprof_backbtn.addWidget(self.gui_radprof['back_check'])
         layout_radprof.addLayout(hbox_radprof_backbtn)
         
-        self.gui_radprof['fit_tbl'] = QtGui.QTableWidget(1,2, frame_radprof)
+        self.gui_radprof['fit_tbl'] = QtGui.QTableWidget(0,2, frame_radprof)
         self.gui_radprof['fit_tbl'].setHorizontalHeaderLabels(['function', 'initial parameters'])
         self.gui_radprof['fit_tbl'].horizontalHeader().setStretchLastSection(True)
         layout_radprof.addWidget(self.gui_radprof['fit_tbl'])
@@ -265,14 +282,24 @@ class Main(QtGui.QMainWindow):
         hbox_radprof_fitbtns2.addWidget(self.gui_radprof['fit_check'])
         layout_radprof.addLayout(hbox_radprof_fitbtns2)
         
-        
+       
         ## Output stuff
-        frame_filesout = QtGui.QGroupBox('Output', self.mnwid)
-        layout_filesout = QtGui.QVBoxLayout(frame_filesout)
+        frame_run = QtGui.QGroupBox('Run', self.mnwid)
+        layout_run = QtGui.QVBoxLayout(frame_run)
         
-        self.gui_file['out_btn'] = QtGui.QPushButton('Save to EMD', frame_filesout)
-        self.gui_file['out_btn'].clicked.connect(self.on_saveEMDFile)
-        layout_filesout.addWidget(self.gui_file['out_btn'])
+        self.gui_run['run_btn'] = QtGui.QPushButton('Run Current', frame_run)
+        self.gui_run['run_btn'].clicked.connect(self.on_runsgl)
+        self.gui_run['all_btn'] = QtGui.QPushButton('Run All', frame_run)
+        self.gui_run['all_btn'].clicked.connect(self.on_runall)
+        hbox_run = QtGui.QHBoxLayout()
+        hbox_run.addWidget(self.gui_run['run_btn'])
+        hbox_run.addWidget(self.gui_run['all_btn'])
+        layout_run.addLayout(hbox_run)
+        
+        self.gui_run['out_btn'] = QtGui.QPushButton('Save to EMD', frame_run)
+        self.gui_run['out_btn'].clicked.connect(self.on_saveEMDFile)
+        layout_run.addWidget(self.gui_run['out_btn'])
+        
         
         
         vbox_left = QtGui.QVBoxLayout()
@@ -300,7 +327,7 @@ class Main(QtGui.QMainWindow):
         sep4.setFrameStyle(QtGui.QFrame.HLine | QtGui.QFrame.Sunken)
         vbox_left.addWidget(sep4)
         
-        vbox_left.addWidget(frame_filesout)
+        vbox_left.addWidget(frame_run)
         
         vbox_left.addStretch(1)
         
@@ -374,14 +401,34 @@ class Main(QtGui.QMainWindow):
             
             self.gui_file['in_txt'].setText(fname)
             
+            # get and save data
             data, dims = self.femd_in.get_emdgroup(self.femd_in.list_emds[0])
             
-            #data = np.swapaxes(data, 0,2)
-            #data = np.swapaxes(data, 1,2)
+            assert(len(data.shape)==2 or len(data.shape)==3)
             
-            self.data = np.copy(data[:,:,0])
-            self.dims = dims[0:2]
+            if len(data.shape)==2:
+                data = data[:,:,np.newaxis]
             
+            self.data = np.copy(data)
+            self.dims = copy.deepcopy(dims)
+            
+            # configure index slider
+            self.idx = 0
+            
+            if len(data.shape)==3:
+                self.gui_file['idx_slider'].setMinimum(0)
+                self.gui_file['idx_slider'].setMaximum(self.data.shape[2]-1)
+            
+            # reset parameters
+            self.settings = {}
+            self.points = [None]*data.shape[2]
+            self.center = [None]*data.shape[2]
+            self.dists = [None]*data.shape[2]
+            self.radprof = [None]*data.shape[2]
+            self.back_params = [None]*data.shape[2]
+            self.res = [None]*data.shape[2]
+            
+            # configure intensity sliders
             min_data = np.min(self.data)
             max_data = np.max(self.data)
             
@@ -392,6 +439,8 @@ class Main(QtGui.QMainWindow):
             self.gui_localmax['max_slider'].setMinimum(min_data)
             self.gui_localmax['max_slider'].setMaximum(max_data)
             self.gui_localmax['max_slider'].setValue(max_data)
+            
+
             
             
             self.update_localmax()
@@ -421,16 +470,67 @@ class Main(QtGui.QMainWindow):
         hdl = emt.eva.ring_diff.put_sglgroup(grp_eva, self.femd_in.file_hdl.filename.split('/')[-1], self.femd_in.list_emds[0])
         
         # insert the result datasets        
-        if not self.radprof is None:
-            femd.put_emdgroup('radial_profile', self.radprof[:,1], ( (self.radprof[:,0], 'radial distance', self.dims[0][2]), ), parent=hdl, overwrite=True)
-        if not self.res is None:
-            femd.put_emdgroup('fit_results', self.res, ( ( np.array(range(self.res.shape[0])), 'parameters', '[]'), ), parent=hdl, overwrite=True)
-        if not self.center is None:
-            femd.put_emdgroup('centers', self.center, ( ( np.array(range(2)), 'dimension', self.dims[0][2]), ), parent=hdl, overwrite=True) 
-        if not self.dists is None:
-            femd.put_emdgroup('distortions', self.dists, ( ( np.array(range(self.dists.shape[0])), 'parameters', '[]'), ), parent=hdl, overwrite=True)
-        if not self.back_params is None:
-            femd.put_emdgroup('back_results', self.back_params, ( ( np.array(range(self.back_params.shape[0])), 'background parameters', '[]'), ), parent=hdl, overwrite=True)
+        
+        n = None
+        if len(self.dims) == 3:
+            n = None
+            for i in range(len(self.radprof)):
+                if not self.radprof[i] is None:
+                    n = i
+                    radprof = np.zeros( (self.radprof[i].shape[0], len(self.radprof)) )
+                    for ii in range(len(self.radprof)):
+                        if not self.radprof[ii] is None:
+                            radprof[:,ii] = self.radprof[ii][:,1]
+                    break
+            femd.put_emdgroup('radial_profile', radprof, ( (self.radprof[n][:,0], 'radial distance', self.dims[0][2]), self.dims[2] ), parent=hdl, overwrite=True)
+            
+            for i in range(len(self.res)):
+                if not self.res[i] is None:
+                    res = np.zeros( (self.res[i].shape[0], len(self.res)) )
+                    for ii in range(len(self.res)):
+                        if not self.res[ii] is None:
+                            res[:,ii] = self.res[ii][:]
+                    break
+            femd.put_emdgroup('fit_results', res, ( ( np.array(range(res.shape[0])), 'parameters', '[]'), self.dims[2] ), parent=hdl, overwrite=True)
+            
+            for i in range(len(self.center)):
+                if not self.center[i] is None:
+                    centers = np.zeros( (2, len(self.center)) )
+                    for ii in range(len(self.center)):
+                        if not self.center[ii] is None:
+                            centers[:,ii] = self.center[ii][:]
+                    break
+            femd.put_emdgroup('centers', centers, ( ( np.array(range(2)), 'dimension', self.dims[0][2]), self.dims[2] ), parent=hdl, overwrite=True) 
+            
+            for i in range(len(self.dists)):
+                if not self.dists[i] is None:
+                    dists = np.zeros( (self.dists[i].shape[0], len(self.dists)) )
+                    for ii in range(len(self.dists)):
+                        if not self.dists[ii] is None:
+                            dists[:,ii] = self.dists[ii][:]
+                    break
+            femd.put_emdgroup('distortions', dists, ( ( np.array(range(dists.shape[0])), 'parameters', '[]'), self.dims[2] ), parent=hdl, overwrite=True)
+            
+            for i in range(len(self.back_params)):
+                if not self.back_params[i] is None:
+                    back_params = np.zeros( (self.back_params[i].shape[0], len(self.back_params)) )
+                    for ii in range(len(self.back_params)):
+                        if not self.back_params[ii] is None:
+                            back_params[:,ii] = self.back_params[ii][:]
+                    break
+            femd.put_emdgroup('back_results', back_params, ( ( np.array(range(back_params.shape[0])), 'background parameters', '[]'), self.dims[2] ), parent=hdl, overwrite=True)
+            
+        else:
+            if not self.radprof[0] is None:
+                femd.put_emdgroup('radial_profile', self.radprof[0][:,1], ( (self.radprof[0][:,0], 'radial_distance', self.dims[0][2]), ), parent=hdl, overwrite=True)
+            if not self.res[0] is None:
+                femd.put_emdgroup('fit_results', self.res[0], ( ( np.array(range(self.res[0].shape[0])), 'parameters', '[]'), ), parent=hdl, overwrite=True)
+            if not self.center[0] is None:
+                femd.put_emdgroup('centers', self.center[0], ( ( np.array(range(2)), 'dimension', self.dims[0][2]), ), parent=hdl, overwrite=True) 
+            if not self.dists[0] is None:
+                femd.put_emdgroup('distortions', self.dists[0], ( ( np.array(range(self.dists[0].shape[0])), 'parameters', '[]'), ), parent=hdl, overwrite=True)
+            if not self.back_params[0] is None:
+                femd.put_emdgroup('back_results', self.back_params[0], ( ( np.array(range(self.back_params[0].shape[0])), 'background parameters', '[]'), ), parent=hdl, overwrite=True)
 
         # save settings 
         # make them valid
@@ -440,14 +540,13 @@ class Main(QtGui.QMainWindow):
             if not key in mysettings:
                 mysettings[key] = emt.eva.ring_diff.min_dummie_settings[key]
         
-        import pdb;pdb.set_trace()
-        
         emt.eva.ring_diff.put_settings( hdl, mysettings )
         
         # save a comment
         femd.put_comment( 'Ring diffraction evaluation saved from gui_ringdiff.' )
 
-    
+        # close file
+        del femd
     
     def on_intensitySlider(self):
         '''
@@ -463,11 +562,34 @@ class Main(QtGui.QMainWindow):
         self.gui_localmax['max_value'].setText('{:d}'.format(max_val))     
          
         # update plot
-        self.plt_localmax_img.setLevels( (min_val, max_val) )
+        if not self.plt_localmax_img is None:
+            self.plt_localmax_img.setLevels( (min_val, max_val) )
         
         # update settings
         self.settings['plt_imgminmax'] = (min_val, max_val)
 
+
+
+    def on_indexSlider(self):
+        '''
+        Index slider to run through image series.
+        '''
+        
+        # get value
+        val = self.gui_file['idx_slider'].value()
+        
+        # update label
+        self.gui_file['idx_value'].setText('{:d}'.format(val))
+        
+        # save in main
+        self.idx = val
+        
+        # update plot
+        temp = self.right.currentWidget()
+        self.update_RadProf()
+        self.update_polar()
+        self.update_localmax()
+        self.right.setCurrentWidget(temp)
 
 
     def update_localmax(self):
@@ -487,15 +609,15 @@ class Main(QtGui.QMainWindow):
             axis2.setLabel(self.dims[1][1], self.dims[1][2])
            
             # plot image
-            self.plt_localmax_img = pg.ImageItem(self.data.astype('float64'), levels=(self.gui_localmax['min_slider'].value(), self.gui_localmax['max_slider'].value()))
+            self.plt_localmax_img = pg.ImageItem(self.data[:,:,self.idx].astype('float64'), levels=(self.gui_localmax['min_slider'].value(), self.gui_localmax['max_slider'].value()))
             self.plt_localmax_img.setZValue(-100)
             self.plt_localmax_img.setRect(pg.QtCore.QRectF( self.dims[0][0][0],self.dims[1][0][0],self.dims[0][0][-1]-self.dims[0][0][0],self.dims[1][0][-1]-self.dims[1][0][0]))
             self.plt_localmax.addItem(self.plt_localmax_img)
             
-            if not self.points is None:
+            if not self.points[self.idx] is None:
             
                 # draw points
-                self.plt_localmax.plot(self.points[:,0], self.points[:,1], pen=None, symbol='o', symbolPen=(255,0,0), symbolBrush=None)
+                self.plt_localmax.plot(self.points[self.idx][:,0], self.points[self.idx][:,1], pen=None, symbol='o', symbolPen=(255,0,0), symbolBrush=None)
 
         self.right.setCurrentWidget( self.right.widget(self.right_tabs['localmax']))
 
@@ -532,7 +654,7 @@ class Main(QtGui.QMainWindow):
         self.settings['lmax_range'] = rrange
             
         # find local max
-        points = emt.algo.local_max.local_max(self.data, self.settings['lmax_r'], self.settings['lmax_thresh'])
+        points = emt.algo.local_max.local_max(self.data[:,:,self.idx], self.settings['lmax_r'], self.settings['lmax_thresh'])
         points = emt.algo.local_max.points_todim(points, self.dims)
                 
         # filter to single ring if input provided
@@ -540,7 +662,7 @@ class Main(QtGui.QMainWindow):
             points = emt.algo.distortion.filter_ring(points, self.settings['lmax_cinit'], self.settings['lmax_range'])
         
         # save points in main
-        self.points = points
+        self.points[self.idx] = points
         
         # update localmax view
         self.update_localmax() 
@@ -559,12 +681,12 @@ class Main(QtGui.QMainWindow):
         
         self.plt_polar.clear()
         
-        if not self.center is None:
+        if not self.center[self.idx] is None:
             # update center in left column
-            self.gui_polar['center_lbl'].setText('center: ({:.3f}, {:.3f})'.format(self.center[0], self.center[1]))
+            self.gui_polar['center_lbl'].setText('center: ({:.3f}, {:.3f})'.format(self.center[self.idx][0], self.center[self.idx][1]))
         
-            if not self.points is None:
-                points_plr = emt.algo.distortion.points_topolar(self.points, self.center)
+            if not self.points[self.idx] is None:
+                points_plr = emt.algo.distortion.points_topolar(self.points[self.idx], self.center[self.idx])
         
                 # horizontal mean line
                 self.plt_polar.plot( [-np.pi, np.pi], [np.mean(points_plr[:,0]), np.mean(points_plr[:,0])], pen=pg.mkPen('k', style=QtCore.Qt.DashLine))
@@ -572,23 +694,23 @@ class Main(QtGui.QMainWindow):
                 # uncorrected radial positions
                 self.plt_polar.plot(points_plr[:,1], points_plr[:,0], pen=None, symbol='x', symbolPen=(255,0,0), symbolBrush=None)
         
-                if not self.dists is None:
+                if not self.dists[self.idx] is None:
                     
                     xpl_ell = np.linspace(-np.pi, np.pi, 200)
                     # single distortions
                     for i in range(len(self.settings['ns'])):
-                        self.plt_polar.plot( xpl_ell, self.dists[0]*emt.algo.distortion.rad_dis(xpl_ell, self.dists[i*2+1], self.dists[i*2+2], self.settings['ns'][i]), pen=pg.mkPen('m', style=QtCore.Qt.DashLine) )
+                        self.plt_polar.plot( xpl_ell, self.dists[self.idx][0]*emt.algo.distortion.rad_dis(xpl_ell, self.dists[self.idx][i*2+1], self.dists[self.idx][i*2+2], self.settings['ns'][i]), pen=pg.mkPen('m', style=QtCore.Qt.DashLine) )
                     
                     # sum of distortions
-                    sum_dists = self.dists[0]*np.ones(xpl_ell.shape)
+                    sum_dists = self.dists[self.idx][0]*np.ones(xpl_ell.shape)
                     for i in range(len(self.settings['ns'])):
-                        sum_dists *= emt.algo.distortion.rad_dis( xpl_ell, self.dists[i*2+1], self.dists[i*2+2], self.settings['ns'][i])
+                        sum_dists *= emt.algo.distortion.rad_dis( xpl_ell, self.dists[self.idx][i*2+1], self.dists[self.idx][i*2+2], self.settings['ns'][i])
                     self.plt_polar.plot( xpl_ell, sum_dists, pen=(0,0,255))
 
                     # corrected radial positions
                     points_plr_corr = np.copy(points_plr)
                     for i in range(len(self.settings['ns'])):
-                        points_plr_corr[:,0] /= emt.algo.distortion.rad_dis(points_plr_corr[:,1], self.dists[i*2+1], self.dists[i*2+2], self.settings['ns'][i])
+                        points_plr_corr[:,0] /= emt.algo.distortion.rad_dis(points_plr_corr[:,1], self.dists[self.idx][i*2+1], self.dists[self.idx][i*2+2], self.settings['ns'][i])
                     
                     self.plt_polar.plot( points_plr_corr[:,1], points_plr_corr[:,0], pen=None, symbol='x', symbolPen=(0,180,0), symbolBrush=None) 
 
@@ -612,7 +734,7 @@ class Main(QtGui.QMainWindow):
             print('No initial guess given.')
         else:
             self.settings['lmax_cinit'] = cinit
-            self.center=np.array(cinit)
+            self.center[self.idx]=np.array(cinit)
 
         self.update_polar()
         
@@ -620,8 +742,8 @@ class Main(QtGui.QMainWindow):
 
     def on_optimizeCenter(self):
     
-        center = emt.algo.distortion.optimize_center(self.points, self.center)
-        self.center= center
+        center = emt.algo.distortion.optimize_center(self.points[self.idx], self.center[self.idx])
+        self.center[self.idx]= center
         
         self.update_polar()
         
@@ -643,10 +765,10 @@ class Main(QtGui.QMainWindow):
        
         # run optimization
         if len(ns) >= 1:
-            points_plr = emt.algo.distortion.points_topolar(self.points, self.center)
+            points_plr = emt.algo.distortion.points_topolar(self.points[self.idx], self.center[self.idx])
             dists = emt.algo.distortion.optimize_distortion(points_plr, self.settings['ns'])
             
-            self.dists = dists
+            self.dists[self.idx] = dists
             
         self.update_polar()
         
@@ -656,11 +778,11 @@ class Main(QtGui.QMainWindow):
         
         self.plt_radprof.clear()
         
-        if not self.radprof is None:
+        if not self.radprof[self.idx] is None:
         
             # rad profile has been calculated
-            R = np.copy(self.radprof[:,0])
-            I = np.copy(self.radprof[:,1])
+            R = np.copy(self.radprof[self.idx][:,0])
+            I = np.copy(self.radprof[self.idx][:,1])
             
             # cut to fitrange
             if (not len(self.settings['fit_rrange']) == 0) and (self.gui_radprof['fit_check'].isChecked()):
@@ -670,7 +792,7 @@ class Main(QtGui.QMainWindow):
         
             back = None
         
-            if not self.back_params is None:
+            if not self.back_params[self.idx] is None:
             
                 if 'back_xs' in self.settings:
                     # calulate background
@@ -681,7 +803,7 @@ class Main(QtGui.QMainWindow):
                         fit_R = np.append(fit_R, R[ix])
                         fit_I = np.append(fit_I, I[ix])
                        
-                    back = emt.algo.math.sum_functions( R, ('const', 'powlaw'), self.back_params )
+                    back = emt.algo.math.sum_functions( R, ('const', 'powlaw'), self.back_params[self.idx] )
      
                     if not self.gui_radprof['back_check'].isChecked():
                         self.plt_radprof.plot(fit_R, fit_I, pen=None, symbol='x', symbolPen=(0,0,0))
@@ -693,15 +815,15 @@ class Main(QtGui.QMainWindow):
                 I -= back
                 
             
-            if (not self.res is None) and (self.gui_radprof['fit_check'].isChecked()):
+            if (not self.res[self.idx] is None) and (self.gui_radprof['fit_check'].isChecked()):
             
                 # draw fit results
-                fitsum = emt.algo.math.sum_functions( R, self.settings['fit_funcs'], self.res )
+                fitsum = emt.algo.math.sum_functions( R, self.settings['fit_funcs'], self.res[self.idx] )
                 self.plt_radprof.plot(R, fitsum, pen=(0,0,255))
                 
                 i = 0
                 for n in range(len(self.settings['fit_funcs'])):
-                    self.plt_radprof.plot(R, emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][0](R, self.res[i:i+emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][1]]), pen=(0,180,0)) 
+                    self.plt_radprof.plot(R, emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][0](R, self.res[self.idx][i:i+emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][1]]), pen=(0,180,0)) 
                     i += emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][1]
     
             # plot radial profile
@@ -736,7 +858,7 @@ class Main(QtGui.QMainWindow):
         
         # save settings
         if len(pars) == 0:
-            self.settings['rad_rmax'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])*np.min(self.data.shape)/2.0
+            self.settings['rad_rmax'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])*np.min(self.data[:,:,self.idx].shape)/2.0
             self.settings['rad_dr'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])/10.
             self.settings['rad_sigma'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])
         else:
@@ -748,15 +870,15 @@ class Main(QtGui.QMainWindow):
         
         # get the polar coordinate system
         if self.gui_radprof['crct_check'].isChecked():
-            rs, thes = emt.algo.radial_profile.calc_polarcoords( self.center, self.dims, self.settings['ns'], self.dists )
+            rs, thes = emt.algo.radial_profile.calc_polarcoords( self.center[self.idx], self.dims, self.settings['ns'], self.dists[self.idx] )
         else:
-            rs, thes = emt.algo.radial_profile.calc_polarcoords( self.center, self.dims )
+            rs, thes = emt.algo.radial_profile.calc_polarcoords( self.center[self.idx], self.dims )
         
         # get the radial profile
-        R, I = emt.algo.radial_profile.calc_radialprofile( self.data, rs, self.settings['rad_rmax'], self.settings['rad_dr'], self.settings['rad_sigma'] )
+        R, I = emt.algo.radial_profile.calc_radialprofile( self.data[:,:,self.idx], rs, self.settings['rad_rmax'], self.settings['rad_dr'], self.settings['rad_sigma'] )
         
         # save in main
-        self.radprof = np.array([R,I]).transpose()
+        self.radprof[self.idx] = np.array([R,I]).transpose()
     
         # update the plot
         self.update_RadProf()
@@ -803,16 +925,16 @@ class Main(QtGui.QMainWindow):
         fit_R = np.array([])
         fit_I = np.array([])
         for xpoint in self.settings['back_xs']:
-            ix = np.where( np.abs(self.radprof[:,0]-xpoint) <= self.settings['back_xswidth'])
-            fit_R = np.append(fit_R, self.radprof[ix,0])
-            fit_I = np.append(fit_I, self.radprof[ix,1])
+            ix = np.where( np.abs(self.radprof[self.idx][:,0]-xpoint) <= self.settings['back_xswidth'])
+            fit_R = np.append(fit_R, self.radprof[self.idx][ix,0])
+            fit_I = np.append(fit_I, self.radprof[self.idx][ix,1])
         
         # fit power law
         funcs_back = [ 'const', 'powlaw' ]
         res_back = emt.algo.radial_profile.fit_radialprofile( fit_R, fit_I, funcs_back, self.settings['back_init'], maxfev=1000 )
         
         # save output
-        self.back_params = res_back
+        self.back_params[self.idx] = res_back
         
         self.update_RadProf()
        
@@ -864,8 +986,8 @@ class Main(QtGui.QMainWindow):
         if not self.radprof is None:
         
             # rad profile has been calculated
-            R = np.copy(self.radprof[:,0])
-            I = np.copy(self.radprof[:,1])
+            R = np.copy(self.radprof[self.idx][:,0])
+            I = np.copy(self.radprof[self.idx][:,1])
             
             # cut to fitrange
             if not len(self.settings['fit_rrange']) == 0:
@@ -875,7 +997,7 @@ class Main(QtGui.QMainWindow):
         
             back = None
         
-            if (not self.back_params is None) and (self.gui_radprof['back_check'].isChecked()):
+            if (not self.back_params[self.idx] is None) and (self.gui_radprof['back_check'].isChecked()):
             
                 # calulate background
                 fit_R = np.array([])
@@ -885,14 +1007,14 @@ class Main(QtGui.QMainWindow):
                     fit_R = np.append(fit_R, R[ix])
                     fit_I = np.append(fit_I, I[ix])
                        
-                back = emt.algo.math.sum_functions( R, ('const', 'powlaw'), self.back_params )
+                back = emt.algo.math.sum_functions( R, ('const', 'powlaw'), self.back_params[self.idx] )
          
                 I -= back
  
  
             res = emt.algo.radial_profile.fit_radialprofile( R, I, self.settings['fit_funcs'], self.settings['fit_init'], 10000 )
             
-            self.res = res          
+            self.res[self.idx] = res          
                         
         self.update_RadProf()
         
@@ -914,6 +1036,33 @@ class Main(QtGui.QMainWindow):
         for row in sorted(row_to_delete)[::-1]:
             self.gui_radprof['fit_tbl'].removeRow(row)
     
+    
+    
+    def on_runsgl(self):
+    
+        self.on_localmax()
+        
+        self.on_copyCenter()
+        
+        self.on_optimizeCenter()
+        
+        self.on_fitDist()
+        
+        self.on_extractRadProf()
+        
+        self.on_subtractBackground()
+        
+        self.on_fitRadProf()
+        
+    
+    def on_runall(self):
+        
+        if len(self.dims) == 3:
+            for i in range(self.data.shape[2]):
+            
+                self.idx = i
+                
+                self.on_runsgl()
     
     
 if __name__ == '__main__':
