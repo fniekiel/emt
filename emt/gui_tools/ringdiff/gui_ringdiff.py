@@ -7,6 +7,7 @@ import sys
 import numpy as np
 import os
 import copy
+import h5py
 
 import emt.io.emd
 import emt.algo.local_max
@@ -68,6 +69,10 @@ class Main(QtGui.QMainWindow):
         ## file informations
         frame_files = QtGui.QGroupBox('Input', self.mnwid)
         layout_files = QtGui.QVBoxLayout(frame_files)
+        
+        self.gui_file['re_btn'] = QtGui.QPushButton('Reopen Evaluation File')
+        self.gui_file['re_btn'].clicked.connect(self.on_reopen)
+        layout_files.addWidget(self.gui_file['re_btn'])
 
         self.gui_file['in_btn'] = QtGui.QPushButton('Open', frame_files)
         self.gui_file['in_btn'].clicked.connect(self.on_open_infile)
@@ -389,7 +394,13 @@ class Main(QtGui.QMainWindow):
         if e.key() == QtCore.Qt.Key_Escape:
             self.close()
             
-            
+
+
+    def closeEvent(self, event):
+        del self.femd_in
+        QtGui.QMainWindow.closeEvent(self, event)
+        
+         
             
     def on_open_infile(self):
         '''
@@ -440,9 +451,6 @@ class Main(QtGui.QMainWindow):
             self.gui_localmax['max_slider'].setMaximum(max_data)
             self.gui_localmax['max_slider'].setValue(max_data)
             
-
-            
-            
             self.update_localmax()
             
         except: 
@@ -450,6 +458,105 @@ class Main(QtGui.QMainWindow):
             raise
     
     
+    def on_reopen(self):
+    
+        fname, _ = QtGui.QFileDialog.getOpenFileName( self, 'Open EMD evaluation file', filter='EMD files (*.emd);;All files (*.*)')
+        
+        femd = emt.io.emd.fileEMD(fname, readonly=True)
+        
+        # search todo group
+        todo = []
+    
+        # recursive function
+        def proc_group(grp,todo):
+            for item in grp:
+                if grp.get(item, getclass=True) == h5py._hl.group.Group:
+                    item = grp.get(item)
+                    if 'type' in item.attrs:
+                        if item.attrs['type'] == np.string_(emt.eva.ring_diff.cur_eva_vers):
+                            todo.append(item)
+                    proc_group(item, todo)
+        
+        proc_group(femd.file_hdl, todo)
+        
+        grp_eva = todo[0]
+        
+        self.femd_in = emt.io.emd.fileEMD(grp_eva.attrs['filename'].decode('utf-8'), readonly=True)
+        self.gui_file['in_txt'].setText(grp_eva.attrs['filename'].decode('utf-8'))
+            
+        # get and save data
+        data, dims = self.femd_in.get_emdgroup(self.femd_in.list_emds[0])
+            
+        assert(len(data.shape)==2 or len(data.shape)==3)
+            
+        if len(data.shape)==2:
+            data = data[:,:,np.newaxis]
+            
+        self.data = np.copy(data)
+        self.dims = copy.deepcopy(dims)
+            
+        # configure index slider
+        self.idx = 0
+            
+        if len(data.shape)==3:
+            self.gui_file['idx_slider'].setMinimum(0)
+            self.gui_file['idx_slider'].setMaximum(self.data.shape[2]-1)
+        
+        # reset parameters
+        self.settings = emt.eva.ring_diff.get_settings(grp_eva['settings_ringdiffraction'])
+        
+        self.gui_localmax['txt_lmax_r'].setText('{}'.format(self.settings['lmax_r']))
+        self.gui_localmax['txt_lmax_thresh'].setText('{}'.format(self.settings['lmax_thresh']))
+        self.gui_localmax['txt_lmax_cinit'].setText('{:g}, {:g}'.format(self.settings['lmax_cinit'][0], self.settings['lmax_cinit'][1]))
+        self.gui_localmax['txt_lmax_range'].setText('{:g}, {:g}'.format(self.settings['lmax_range'][0], self.settings['lmax_range'][1]))
+        
+        self.gui_polar['dist_txt'].setText( ', '.join(map(str, self.settings['ns']) ) )
+        
+        self.gui_radprof['rad_txt'].setText( '{:g}, {:g}, {:g}'.format(self.settings['rad_rmax'], self.settings['rad_dr'], self.settings['rad_sigma']) )
+        self.gui_radprof['fitxs_txt'].setText( ', '.join(map('{:g}'.format, self.settings['back_xs'])) )
+        self.gui_radprof['fitxsw_txt'].setText( '{:g}'.format(self.settings['back_xswidth']) )
+        self.gui_radprof['back_init_txt'].setText( ', '.join(map('{:g}'.format, self.settings['back_init'])) )
+        
+        
+        
+        n = 0
+        for i in range(len(self.settings['fit_funcs'])):
+            self.gui_radprof['fit_tbl'].insertRow(self.gui_radprof['fit_tbl'].rowCount())
+            new_func = QtGui.QTableWidgetItem( self.settings['fit_funcs'][i] )
+            new_init = QtGui.QTableWidgetItem( ', '.join(map('{:g}'.format, self.settings['fit_init'][n:n+emt.algo.math.lkp_funcs[self.settings['fit_funcs'][i]][1]])) )
+            n += emt.algo.math.lkp_funcs[self.settings['fit_funcs'][i]][1]
+            self.gui_radprof['fit_tbl'].setItem(i,0,new_func)
+            self.gui_radprof['fit_tbl'].setItem(i,1,new_init)
+        
+        self.gui_radprof['fit_range_txt'].setText( ', '.join(map('{:g}'.format, self.settings['fit_rrange'])) )
+        
+        self.points = [None]*data.shape[2]
+        self.center = [None]*data.shape[2]
+        self.dists = [None]*data.shape[2]
+        self.radprof = [None]*data.shape[2]
+        self.back_params = [None]*data.shape[2]
+        self.res = [None]*data.shape[2]
+            
+        # configure intensity sliders
+        min_data = np.min(self.data)
+        max_data = np.max(self.data)
+        
+        new_min = int(min_data + self.settings['plt_imgminmax'][0]*(max_data - min_data) )
+        new_max = int(min_data + self.settings['plt_imgminmax'][1]*(max_data - min_data) )
+           
+        self.gui_localmax['min_slider'].setMinimum(min_data)
+        self.gui_localmax['min_slider'].setMaximum(max_data)
+        self.gui_localmax['min_slider'].setValue( new_min )
+           
+        self.gui_localmax['max_slider'].setMinimum(min_data)
+        self.gui_localmax['max_slider'].setMaximum(max_data)
+        self.gui_localmax['max_slider'].setValue( new_max )
+        
+        self.update_localmax()
+  
+        del femd
+        
+ 
     
     def on_saveEMDFile(self):
         '''
@@ -566,7 +673,9 @@ class Main(QtGui.QMainWindow):
             self.plt_localmax_img.setLevels( (min_val, max_val) )
         
         # update settings
-        self.settings['plt_imgminmax'] = (min_val, max_val)
+        min_data = np.min(self.data)
+        max_data = np.max(self.data)
+        self.settings['plt_imgminmax'] = ( (min_val-min_data)/(max_data - min_data) , (max_val-min_data)/(max_data - min_data) )
 
 
 
