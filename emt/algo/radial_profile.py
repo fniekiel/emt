@@ -100,6 +100,7 @@ def calc_radialprofile( img, rs, rMax, dr, rsigma, mask=None):
     # process mask
     if mask is None:
         mask = np.ones(img.shape)
+    mask = mask.astype('float64')
     mask[np.where( mask > 0 )] = 1
     mask[np.where( mask == 0 )] = np.nan
     

@@ -22,6 +22,69 @@ import pyqtgraph as pg
 pg.setConfigOption('background', 'w')
 pg.setConfigOption('foreground', 'k')
 
+
+class MaskDialog(QtGui.QDialog):
+
+    def __init__(self, parent):
+        super().__init__(parent=parent)
+        
+        self.parent=parent
+        
+        self.setModal(True)
+        
+        self.imgview = pg.ImageView()
+        self.imgview.setImage(parent.data[:,:,parent.idx])
+        self.imgview.ui.roiBtn.hide()
+        self.imgview.ui.menuBtn.hide()
+        
+        self.roi = pg.PolyLineROI([ [int(0.25*parent.data.shape[0]), int(0.25*parent.data.shape[1])], [int(0.75*parent.data.shape[0]), int(0.25*parent.data.shape[1])], [int(0.75*parent.data.shape[0]), int(0.75*parent.data.shape[1])], [int(0.25*parent.data.shape[0]), int(0.75*parent.data.shape[1])]], closed=True)
+        self.imgview.getView().addItem(self.roi)
+        
+        okbtn = QtGui.QPushButton('Use new mask', self)
+        okbtn.clicked.connect(self.accept)
+        okbtn.setDefault(True)
+        
+        cclbtn = QtGui.QPushButton('Remove mask', self)
+        cclbtn.clicked.connect(self.reject)
+
+        vbox = QtGui.QVBoxLayout(self)
+        vbox.addWidget(self.imgview)
+        hbox_btns = QtGui.QHBoxLayout()
+        hbox_btns.addStretch(1)
+        hbox_btns.addWidget(okbtn)
+        hbox_btns.addWidget(cclbtn)
+        vbox.addLayout(hbox_btns)
+        
+        self.setGeometry(100,100,768,768+64)
+        self.setWindowTitle('Create Mask')
+        
+        self.show()
+        
+        
+    def getResult(self):
+        
+        im = QtGui.QImage(self.parent.data[:,:,self.parent.idx].shape[0], self.parent.data[:,:,self.parent.idx].shape[1], QtGui.QImage.Format_ARGB32) 
+        im.fill(1)
+                
+        p = QtGui.QPainter(im)
+        p.setPen(pg.functions.mkPen(None))
+        p.setBrush(pg.functions.mkBrush('k'))
+        p.setTransform(self.roi.itemTransform(self.imgview.getImageItem())[0])
+        p.drawPath(self.roi.shape())
+        p.end()
+        
+        return pg.functions.imageToArray(im)[:,:,0].astype(int)
+        
+        
+    @staticmethod
+    def getMask(parent):
+        dialog = MaskDialog(parent)
+        result = dialog.exec_()
+        mask = dialog.getResult()
+        return (mask, result==QtGui.QDialog.Accepted) 
+
+
+
 class Main(QtGui.QMainWindow):
 
     def __init__(self):
@@ -495,6 +558,7 @@ class Main(QtGui.QMainWindow):
             self.radprof = [None]*data.shape[2]
             self.back_params = [None]*data.shape[2]
             self.res = [None]*data.shape[2]
+            self.mask = None
             
             # configure intensity sliders
             min_data = np.min(self.data)
@@ -600,10 +664,12 @@ class Main(QtGui.QMainWindow):
             self.back_params = [None]*data.shape[2]
             self.res = [None]*data.shape[2]
             
+            # get mask from settings but move it to self.
             if self.settings['mask'] is None:
                 self.mask = None
             else:
                 self.mask = self.settings['mask']
+            del self.settings['mask']
                 
             self.log('.. reusing saved parameter settings.')
                 
@@ -720,6 +786,8 @@ class Main(QtGui.QMainWindow):
             # make them valid
             # create a copy of settings to decouple
             mysettings = copy.deepcopy(self.settings)
+            # reinsert mask
+            mysettings['mask'] = self.mask
             for key in emt.eva.ring_diff.min_dummie_settings:
                 if not key in mysettings:
                     mysettings[key] = emt.eva.ring_diff.min_dummie_settings[key]
@@ -1134,7 +1202,7 @@ class Main(QtGui.QMainWindow):
             self.log('.. calculating coordinate system, not correcting distortions.')
         
         # get the radial profile
-        R, I = emt.algo.radial_profile.calc_radialprofile( self.data[:,:,self.idx], rs, self.settings['rad_rmax'], self.settings['rad_dr'], self.settings['rad_sigma'] )
+        R, I = emt.algo.radial_profile.calc_radialprofile( self.data[:,:,self.idx], rs, self.settings['rad_rmax'], self.settings['rad_dr'], self.settings['rad_sigma'], self.mask )
         
         # save in main
         self.radprof[self.idx] = np.array([R,I]).transpose()
@@ -1146,8 +1214,17 @@ class Main(QtGui.QMainWindow):
 
 
     def on_mask(self):
-        pass
         
+        if not self.data is None:
+            mask, flag = MaskDialog.getMask(self)
+            
+            if flag:
+                self.mask = mask
+                self.log('Created new mask for extracting radial profile.')
+            else:
+                self.mask = None
+                self.log('Removed any mask for extracting radial profile.')
+
         
         
     def on_subtractBackground(self):
