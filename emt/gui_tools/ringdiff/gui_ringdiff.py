@@ -134,7 +134,8 @@ class Main(QtGui.QMainWindow):
         self.gui_localmax['lbl_lmax_cinit'] = QtGui.QLabel('init center: ')
         self.gui_localmax['txt_lmax_cinit'] = QtGui.QLineEdit( '', frame_localmax)
         self.gui_localmax['btn_lmax_cinit'] = QtGui.QPushButton( 'Select', frame_localmax)
-        self.gui_localmax['btn_lmax_cinit'].clicked.connect(self.on_selectCinit)
+        self.gui_localmax['btn_lmax_cinit'].clicked.connect(self.update_localmax)
+        self.gui_localmax['btn_lmax_cinit'].setCheckable(True)
         hbox_lmax_cinit = QtGui.QHBoxLayout()
         hbox_lmax_cinit.addWidget(self.gui_localmax['lbl_lmax_cinit'])
         hbox_lmax_cinit.addWidget(self.gui_localmax['txt_lmax_cinit'])
@@ -240,7 +241,7 @@ class Main(QtGui.QMainWindow):
         self.gui_radprof['fitxs_txt'] = QtGui.QLineEdit('', frame_radprof)
         self.gui_radprof['fitxs_btn'] = QtGui.QPushButton('Select', frame_radprof)
         self.gui_radprof['fitxs_btn'].setCheckable(True)
-        self.gui_radprof['fitxs_btn'].clicked[bool].connect(self.on_selectXs)
+        self.gui_radprof['fitxs_btn'].clicked.connect(self.update_RadProf)
         hbox_radprof_fitxs = QtGui.QHBoxLayout()
         hbox_radprof_fitxs.addWidget(self.gui_radprof['fitxs_lbl'])
         hbox_radprof_fitxs.addWidget(self.gui_radprof['fitxs_txt'])
@@ -360,11 +361,22 @@ class Main(QtGui.QMainWindow):
         
         vbox_left.addStretch(1)
         
+        
+        # localmax tab
         self.plt_localmax = pg.PlotWidget()
         self.plt_localmax.setAspectLocked(True)
         self.plt_localmax.invertY(True)
         
+        self.ch_localmax = {}
+        self.ch_localmax['vLine'] = pg.InfiniteLine(angle=90, movable=False)
+        self.ch_localmax['vLine'].setPen((0,255,0))
+        self.ch_localmax['hLine'] = pg.InfiniteLine(angle=0, movable=False)
+        self.ch_localmax['hLine'].setPen((0,255,0))
         
+        proxy = pg.SignalProxy(self.plt_localmax.scene().sigMouseMoved, rateLimit=60, slot=self.localmax_mouseMoved)
+        self.plt_localmax.scene().sigMouseClicked.connect(self.localmax_mouseClicked)
+        
+        # polar plot tab
         self.plt_polar = pg.PlotWidget()
         self.plt_polar.setMouseEnabled(x=False, y=True)
         self.plt_polar.setXRange(-np.pi, np.pi)
@@ -373,7 +385,17 @@ class Main(QtGui.QMainWindow):
         axis2 = self.plt_polar.getAxis('left')
         axis2.setLabel('r')
         
+        # radial profile plot tab
         self.plt_radprof = pg.PlotWidget()
+        
+        self.ch_radprof = {}
+        self.ch_radprof['vLine'] = pg.InfiniteLine(angle=90, movable=False)
+        self.ch_radprof['vLine'].setPen((0,255,0))
+        self.ch_radprof['hLine'] = pg.InfiniteLine(angle=0, movable=False)
+        self.ch_radprof['hLine'].setPen((0,255,0))
+        
+        proxy2 = pg.SignalProxy(self.plt_radprof.scene().sigMouseMoved, rateLimit=60, slot=self.radprof_mouseMoved)
+        self.plt_radprof.scene().sigMouseClicked.connect(self.radprof_mouseClicked)
         
         
         left = QtGui.QWidget(self.mnwid)
@@ -788,6 +810,11 @@ class Main(QtGui.QMainWindow):
                 # draw points
                 self.plt_localmax.plot(self.points[self.idx][:,0], self.points[self.idx][:,1], pen=None, symbol='o', symbolPen=(255,0,0), symbolBrush=None)
 
+        if self.gui_localmax['btn_lmax_cinit'].isChecked():
+            self.plt_localmax.getPlotItem().addItem(self.ch_localmax['vLine'], ignoreBounds=True)
+            self.plt_localmax.getPlotItem().addItem(self.ch_localmax['hLine'], ignoreBounds=True)
+
+
         self.right.setCurrentWidget( self.right.widget(self.right_tabs['localmax']))
 
         
@@ -842,12 +869,33 @@ class Main(QtGui.QMainWindow):
         # update localmax view
         self.update_localmax() 
             
-            
+
     
-    def on_selectCinit(self):
-        pass
+    def localmax_mouseMoved(self, evt):
+        pos = evt[0]
+        
+        mousePoint = self.plt_localmax.getPlotItem().vb.mapSceneToView(pos)
+        
+        self.ch_localmax['vLine'].setPos(mousePoint.x())
+        self.ch_localmax['hLine'].setPos(mousePoint.y())
         
             
+    def localmax_mouseClicked(self, evt):
+    
+        if self.gui_localmax['btn_lmax_cinit'].isChecked():
+    
+            mousePoint = self.plt_localmax.getPlotItem().vb.mapSceneToView(evt.scenePos())
+        
+            cinit = (mousePoint.x(), mousePoint.y())
+            self.settings['lmax_cinit'] = cinit
+            self.log('Selected initial center guess: ({:g}, {:g}).'.format(self.settings['lmax_cinit'][0], self.settings['lmax_cinit'][1]))
+            self.gui_localmax['txt_lmax_cinit'].setText( ', '.join(map('{:g}'.format, self.settings['lmax_cinit'])) )
+
+            self.gui_localmax['btn_lmax_cinit'].setChecked(False)
+            
+            self.update_localmax()
+            
+    
     
     def update_polar(self):
         '''
@@ -966,7 +1014,7 @@ class Main(QtGui.QMainWindow):
         
         self.plt_radprof.clear()
         
-        if not self.radprof[self.idx] is None:
+        if (not self.radprof is None) and (not self.radprof[self.idx] is None):
         
             # rad profile has been calculated
             R = np.copy(self.radprof[self.idx][:,0])
@@ -1028,6 +1076,10 @@ class Main(QtGui.QMainWindow):
     
             # plot radial profile
             self.plt_radprof.plot(R, I, pen=(255,0,0))
+        
+        if self.gui_radprof['fitxs_btn'].isChecked():
+            self.plt_radprof.getPlotItem().addItem(self.ch_radprof['vLine'], ignoreBounds=True)
+            self.plt_radprof.getPlotItem().addItem(self.ch_radprof['hLine'], ignoreBounds=True)
         
         self.right.setCurrentWidget( self.right.widget(self.right_tabs['radprof']))
         
@@ -1153,12 +1205,7 @@ class Main(QtGui.QMainWindow):
         
         self.update_RadProf()
        
-       
-    
-    def on_selectXs(self, status):
-        pass
         
-   
    
     def on_fitRadProf(self):
         '''
@@ -1263,6 +1310,37 @@ class Main(QtGui.QMainWindow):
             self.gui_radprof['fit_tbl'].removeRow(row)
     
     
+    def radprof_mouseMoved(self, evt):
+        pos = evt[0]
+        
+        mousePoint = self.plt_radprof.getPlotItem().vb.mapSceneToView(pos)
+        
+        self.ch_radprof['vLine'].setPos(mousePoint.x())
+        self.ch_radprof['hLine'].setPos(mousePoint.y())
+        
+            
+    def radprof_mouseClicked(self, evt):
+    
+        if self.gui_radprof['fitxs_btn'].isChecked():
+    
+            mousePoint = self.plt_radprof.getPlotItem().vb.mapSceneToView(evt.scenePos())
+            
+            fitxs = self.gui_radprof['fitxs_txt'].text().strip()
+            
+            if fitxs == '':
+                fitxs = []
+            else:
+                fitxs = [float(item.strip()) for item in fitxs.split(',')]
+            
+            fitxs.append(mousePoint.x())
+            
+            self.settings['back_xs'] = fitxs
+            
+            self.gui_radprof['fitxs_txt'].setText( ', '.join(map('{:g}'.format, self.settings['back_xs'])) )
+            
+            self.update_RadProf()
+            
+
     
     def on_runsgl(self):
     
