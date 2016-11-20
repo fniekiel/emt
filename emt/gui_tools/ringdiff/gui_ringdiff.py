@@ -33,6 +33,7 @@ class Main(QtGui.QMainWindow):
         self.gui_polar = {}
         self.gui_radprof = {}
         self.gui_run = {}
+        self.log_wdg = None
         
         self.plt_localmax = None
         self.plt_localmax_img = None
@@ -42,6 +43,11 @@ class Main(QtGui.QMainWindow):
         self.reset()
         
         self.initUI()
+        
+        self.log('This is the "Ring Diffraction Pattern Evaluation" tool, part of the OpenNCEM package.')
+        self.log('----------')
+        self.log('Ready to go ..')
+        
         
         
     def reset(self):
@@ -57,6 +63,7 @@ class Main(QtGui.QMainWindow):
         self.mask = None
         
     
+    
     def initUI(self):
     
         self.statusBar().showMessage('Welcome')
@@ -65,7 +72,14 @@ class Main(QtGui.QMainWindow):
         
         self.setCentralWidget(self.mnwid)
         
-        
+        self.log_wdg = QtGui.QWidget()
+        self.log_txt = QtGui.QPlainTextEdit(self.log_wdg)
+        self.log_txt.setReadOnly(True)
+        hbox_log = QtGui.QHBoxLayout(self.log_wdg)
+        hbox_log.addWidget(self.log_txt)
+        self.log_wdg.setGeometry(300,300,500,200)
+        self.log_wdg.setWindowTitle('Log')
+        self.log_wdg.show()
         
         ## file informations
         frame_files = QtGui.QGroupBox('Input', self.mnwid)
@@ -388,6 +402,11 @@ class Main(QtGui.QMainWindow):
         
         self.show()
         
+
+
+    def log(self, msg):
+        self.log_txt.appendPlainText(msg)
+
         
         
     def keyPressEvent(self, e):
@@ -398,7 +417,9 @@ class Main(QtGui.QMainWindow):
 
 
     def closeEvent(self, event):
+        self.log('Goodbye!')
         del self.femd_in
+        self.log_wdg.close()
         QtGui.QMainWindow.closeEvent(self, event)
         
          
@@ -413,13 +434,17 @@ class Main(QtGui.QMainWindow):
             
             self.gui_file['in_txt'].setText(fname)
             
+            self.log('Opening file "{}" ..'.format(fname))
+            
             # get and save data
             data, dims = self.femd_in.get_emdgroup(self.femd_in.list_emds[0])
-            
-            assert(len(data.shape)==2 or len(data.shape)==3)
+            self.log('.. found EMD type group at "{}".'.format(self.femd_in.list_emds[0].name))
             
             if len(data.shape)==2:
                 data = data[:,:,np.newaxis]
+                self.log('.. single image.')
+            elif len(data.shape)==3:
+                self.log('.. series of {:d} images.'.format(data.shape[2])) 
             
             self.data = np.copy(data)
             self.dims = copy.deepcopy(dims)
@@ -456,112 +481,125 @@ class Main(QtGui.QMainWindow):
             
         except: 
             self.gui_file['in_txt'].setText('')
-            raise
+            self.log('Failed to open EMD file "{}".'.format(fname))
+            raise TypeError()
     
     
     def on_reopen(self):
     
         fname, _ = QtGui.QFileDialog.getOpenFileName( self, 'Open EMD evaluation file', filter='EMD files (*.emd);;All files (*.*)')
         
-        femd = emt.io.emd.fileEMD(fname, readonly=True)
-        
-        # search todo group
-        todo = []
-    
-        # recursive function
-        def proc_group(grp,todo):
-            for item in grp:
-                if grp.get(item, getclass=True) == h5py._hl.group.Group:
-                    item = grp.get(item)
-                    if 'type' in item.attrs:
-                        if item.attrs['type'] == np.string_(emt.eva.ring_diff.cur_eva_vers):
-                            todo.append(item)
-                    proc_group(item, todo)
-        
-        proc_group(femd.file_hdl, todo)
-        
-        grp_eva = todo[0]
-        
-        self.femd_in = emt.io.emd.fileEMD(grp_eva.attrs['filename'].decode('utf-8'), readonly=True)
-        self.gui_file['in_txt'].setText(grp_eva.attrs['filename'].decode('utf-8'))
+        try:
+            femd = emt.io.emd.fileEMD(fname, readonly=True)
             
-        # get and save data
-        data, dims = self.femd_in.get_emdgroup(self.femd_in.list_emds[0])
+            self.log('Reopening evaluation file "{}" ..'.format(fname))
             
-        assert(len(data.shape)==2 or len(data.shape)==3)
+            # search todo group
+            todo = []
+        
+            # recursive function
+            def proc_group(grp,todo):
+                for item in grp:
+                    if grp.get(item, getclass=True) == h5py._hl.group.Group:
+                        item = grp.get(item)
+                        if 'type' in item.attrs:
+                            if item.attrs['type'] == np.string_(emt.eva.ring_diff.cur_eva_vers):
+                                todo.append(item)
+                        proc_group(item, todo)
             
-        if len(data.shape)==2:
-            data = data[:,:,np.newaxis]
+            proc_group(femd.file_hdl, todo)
             
-        self.data = np.copy(data)
-        self.dims = copy.deepcopy(dims)
+            grp_eva = todo[0]
+            self.log('.. found evaluation group at "{}".'.format(grp_eva.name))
             
-        # configure index slider
-        self.idx = 0
+            self.femd_in = emt.io.emd.fileEMD(grp_eva.attrs['filename'].decode('utf-8'), readonly=True)
+            self.gui_file['in_txt'].setText(grp_eva.attrs['filename'].decode('utf-8'))
             
-        if len(data.shape)==3:
-            self.gui_file['idx_slider'].setMinimum(0)
-            self.gui_file['idx_slider'].setMaximum(self.data.shape[2]-1)
-        
-        # reset parameters
-        self.settings = emt.eva.ring_diff.get_settings(grp_eva['settings_ringdiffraction'])
-        
-        self.gui_localmax['txt_lmax_r'].setText('{}'.format(self.settings['lmax_r']))
-        self.gui_localmax['txt_lmax_thresh'].setText('{}'.format(self.settings['lmax_thresh']))
-        self.gui_localmax['txt_lmax_cinit'].setText('{:g}, {:g}'.format(self.settings['lmax_cinit'][0], self.settings['lmax_cinit'][1]))
-        self.gui_localmax['txt_lmax_range'].setText('{:g}, {:g}'.format(self.settings['lmax_range'][0], self.settings['lmax_range'][1]))
-        
-        self.gui_polar['dist_txt'].setText( ', '.join(map(str, self.settings['ns']) ) )
-        
-        self.gui_radprof['rad_txt'].setText( '{:g}, {:g}, {:g}'.format(self.settings['rad_rmax'], self.settings['rad_dr'], self.settings['rad_sigma']) )
-        self.gui_radprof['fitxs_txt'].setText( ', '.join(map('{:g}'.format, self.settings['back_xs'])) )
-        self.gui_radprof['fitxsw_txt'].setText( '{:g}'.format(self.settings['back_xswidth']) )
-        self.gui_radprof['back_init_txt'].setText( ', '.join(map('{:g}'.format, self.settings['back_init'])) )
-           
-        n = 0
-        for i in range(len(self.settings['fit_funcs'])):
-            self.gui_radprof['fit_tbl'].insertRow(self.gui_radprof['fit_tbl'].rowCount())
-            new_func = QtGui.QTableWidgetItem( self.settings['fit_funcs'][i] )
-            new_init = QtGui.QTableWidgetItem( ', '.join(map('{:g}'.format, self.settings['fit_init'][n:n+emt.algo.math.lkp_funcs[self.settings['fit_funcs'][i]][1]])) )
-            n += emt.algo.math.lkp_funcs[self.settings['fit_funcs'][i]][1]
-            self.gui_radprof['fit_tbl'].setItem(i,0,new_func)
-            self.gui_radprof['fit_tbl'].setItem(i,1,new_init)
-        
-        self.gui_radprof['fit_range_txt'].setText( ', '.join(map('{:g}'.format, self.settings['fit_rrange'])) )
-        
-        self.points = [None]*data.shape[2]
-        self.center = [None]*data.shape[2]
-        self.dists = [None]*data.shape[2]
-        self.radprof = [None]*data.shape[2]
-        self.back_params = [None]*data.shape[2]
-        self.res = [None]*data.shape[2]
-        
-        if self.settings['mask'] is None:
-            self.mask = None
-        else:
-            self.mask = self.settings['mask']
+            # get and save data
+            data, dims = self.femd_in.get_emdgroup(self.femd_in.list_emds[0])
             
+            self.log('.. loading data from "{}"-"{}".'.format(self.femd_in.file_hdl.filename, self.femd_in.list_emds[0].name))
             
-        # configure intensity sliders
-        min_data = np.min(self.data)
-        max_data = np.max(self.data)
-        
-        new_min = int(min_data + self.settings['plt_imgminmax'][0]*(max_data - min_data) )
-        new_max = int(min_data + self.settings['plt_imgminmax'][1]*(max_data - min_data) )
-           
-        self.gui_localmax['min_slider'].setMinimum(min_data)
-        self.gui_localmax['min_slider'].setMaximum(max_data)
-        self.gui_localmax['min_slider'].setValue( new_min )
-           
-        self.gui_localmax['max_slider'].setMinimum(min_data)
-        self.gui_localmax['max_slider'].setMaximum(max_data)
-        self.gui_localmax['max_slider'].setValue( new_max )
-        
-        self.update_localmax()
-  
-        del femd
-        
- 
+            if len(data.shape)==2:
+                data = data[:,:,np.newaxis]
+                self.log('.. single image.')
+            elif len(data.shape)==3:
+                self.log('.. series of {:d} images.'.format(data.shape[2])) 
+            
+            self.data = np.copy(data)
+            self.dims = copy.deepcopy(dims)
+                
+            # configure index slider
+            self.idx = 0
+                
+            if len(data.shape)==3:
+                self.gui_file['idx_slider'].setMinimum(0)
+                self.gui_file['idx_slider'].setMaximum(self.data.shape[2]-1)
+            
+            # reset parameters
+            self.settings = emt.eva.ring_diff.get_settings(grp_eva['settings_ringdiffraction'])
+            
+            self.gui_localmax['txt_lmax_r'].setText('{}'.format(self.settings['lmax_r']))
+            self.gui_localmax['txt_lmax_thresh'].setText('{}'.format(self.settings['lmax_thresh']))
+            self.gui_localmax['txt_lmax_cinit'].setText('{:g}, {:g}'.format(self.settings['lmax_cinit'][0], self.settings['lmax_cinit'][1]))
+            self.gui_localmax['txt_lmax_range'].setText('{:g}, {:g}'.format(self.settings['lmax_range'][0], self.settings['lmax_range'][1]))
+            
+            self.gui_polar['dist_txt'].setText( ', '.join(map(str, self.settings['ns']) ) )
+            
+            self.gui_radprof['rad_txt'].setText( '{:g}, {:g}, {:g}'.format(self.settings['rad_rmax'], self.settings['rad_dr'], self.settings['rad_sigma']) )
+            self.gui_radprof['fitxs_txt'].setText( ', '.join(map('{:g}'.format, self.settings['back_xs'])) )
+            self.gui_radprof['fitxsw_txt'].setText( '{:g}'.format(self.settings['back_xswidth']) )
+            self.gui_radprof['back_init_txt'].setText( ', '.join(map('{:g}'.format, self.settings['back_init'])) )
+               
+            n = 0
+            for i in range(len(self.settings['fit_funcs'])):
+                self.gui_radprof['fit_tbl'].insertRow(self.gui_radprof['fit_tbl'].rowCount())
+                new_func = QtGui.QTableWidgetItem( self.settings['fit_funcs'][i] )
+                new_init = QtGui.QTableWidgetItem( ', '.join(map('{:g}'.format, self.settings['fit_init'][n:n+emt.algo.math.lkp_funcs[self.settings['fit_funcs'][i]][1]])) )
+                n += emt.algo.math.lkp_funcs[self.settings['fit_funcs'][i]][1]
+                self.gui_radprof['fit_tbl'].setItem(i,0,new_func)
+                self.gui_radprof['fit_tbl'].setItem(i,1,new_init)
+            
+            self.gui_radprof['fit_range_txt'].setText( ', '.join(map('{:g}'.format, self.settings['fit_rrange'])) )
+            
+            self.points = [None]*data.shape[2]
+            self.center = [None]*data.shape[2]
+            self.dists = [None]*data.shape[2]
+            self.radprof = [None]*data.shape[2]
+            self.back_params = [None]*data.shape[2]
+            self.res = [None]*data.shape[2]
+            
+            if self.settings['mask'] is None:
+                self.mask = None
+            else:
+                self.mask = self.settings['mask']
+                
+            self.log('.. reusing saved parameter settings.')
+                
+                
+            # configure intensity sliders
+            min_data = np.min(self.data)
+            max_data = np.max(self.data)
+            
+            new_min = int(min_data + self.settings['plt_imgminmax'][0]*(max_data - min_data) )
+            new_max = int(min_data + self.settings['plt_imgminmax'][1]*(max_data - min_data) )
+               
+            self.gui_localmax['min_slider'].setMinimum(min_data)
+            self.gui_localmax['min_slider'].setMaximum(max_data)
+            self.gui_localmax['min_slider'].setValue( new_min )
+               
+            self.gui_localmax['max_slider'].setMinimum(min_data)
+            self.gui_localmax['max_slider'].setMaximum(max_data)
+            self.gui_localmax['max_slider'].setValue( new_max )
+            
+            self.update_localmax()
+      
+            del femd
+            
+        except:
+            self.log('Reopening EMD evaluation file "{}" failed.'.format(fname))
+            raise RuntimeError()
+            
     
     def on_saveEMDFile(self):
         '''
@@ -569,96 +607,104 @@ class Main(QtGui.QMainWindow):
         '''
         fname, _ = QtGui.QFileDialog.getSaveFileName(self, 'Save to EMD file', filter='EMD files (*.emd);;All files (*.*)')
         
-        # create/overwrite outfile
-        if os.path.isfile(fname):
-            os.remove(fname)
-        femd = emt.io.emd.fileEMD(fname)            
+        try:
+            self.log('Saving evaluation to file "{}".'.format(fname))
             
-        if 'evaluation' in femd.file_hdl:
-            grp_eva = femd.file_hdl['evaluation']
-        else:
-            grp_eva = femd.file_hdl.create_group('evaluation')
-        
-        hdl = emt.eva.ring_diff.put_sglgroup(grp_eva, self.femd_in.file_hdl.filename.split('/')[-1], self.femd_in.list_emds[0])
-        
-        # insert the result datasets        
-        
-        n = None
-        if len(self.dims) == 3:
+            # create/overwrite outfile
+            if os.path.isfile(fname):
+                os.remove(fname)
+            femd = emt.io.emd.fileEMD(fname)            
+                
+            if 'evaluation' in femd.file_hdl:
+                grp_eva = femd.file_hdl['evaluation']
+            else:
+                grp_eva = femd.file_hdl.create_group('evaluation')
+            
+            hdl = emt.eva.ring_diff.put_sglgroup(grp_eva, self.femd_in.file_hdl.filename.split('/')[-1], self.femd_in.list_emds[0])
+            
+            # insert the result datasets        
+            
             n = None
-            for i in range(len(self.radprof)):
-                if not self.radprof[i] is None:
-                    n = i
-                    radprof = np.zeros( (self.radprof[i].shape[0], len(self.radprof)) )
-                    for ii in range(len(self.radprof)):
-                        if not self.radprof[ii] is None:
-                            radprof[:,ii] = self.radprof[ii][:,1]
-                    break
-            femd.put_emdgroup('radial_profile', radprof, ( (self.radprof[n][:,0], 'radial distance', self.dims[0][2]), self.dims[2] ), parent=hdl, overwrite=True)
-            
-            for i in range(len(self.res)):
-                if not self.res[i] is None:
-                    res = np.zeros( (self.res[i].shape[0], len(self.res)) )
-                    for ii in range(len(self.res)):
-                        if not self.res[ii] is None:
-                            res[:,ii] = self.res[ii][:]
-                    break
-            femd.put_emdgroup('fit_results', res, ( ( np.array(range(res.shape[0])), 'parameters', '[]'), self.dims[2] ), parent=hdl, overwrite=True)
-            
-            for i in range(len(self.center)):
-                if not self.center[i] is None:
-                    centers = np.zeros( (2, len(self.center)) )
-                    for ii in range(len(self.center)):
-                        if not self.center[ii] is None:
-                            centers[:,ii] = self.center[ii][:]
-                    break
-            femd.put_emdgroup('centers', centers, ( ( np.array(range(2)), 'dimension', self.dims[0][2]), self.dims[2] ), parent=hdl, overwrite=True) 
-            
-            for i in range(len(self.dists)):
-                if not self.dists[i] is None:
-                    dists = np.zeros( (self.dists[i].shape[0], len(self.dists)) )
-                    for ii in range(len(self.dists)):
-                        if not self.dists[ii] is None:
-                            dists[:,ii] = self.dists[ii][:]
-                    break
-            femd.put_emdgroup('distortions', dists, ( ( np.array(range(dists.shape[0])), 'parameters', '[]'), self.dims[2] ), parent=hdl, overwrite=True)
-            
-            for i in range(len(self.back_params)):
-                if not self.back_params[i] is None:
-                    back_params = np.zeros( (self.back_params[i].shape[0], len(self.back_params)) )
-                    for ii in range(len(self.back_params)):
-                        if not self.back_params[ii] is None:
-                            back_params[:,ii] = self.back_params[ii][:]
-                    break
-            femd.put_emdgroup('back_results', back_params, ( ( np.array(range(back_params.shape[0])), 'background parameters', '[]'), self.dims[2] ), parent=hdl, overwrite=True)
-            
-        else:
-            if not self.radprof[0] is None:
-                femd.put_emdgroup('radial_profile', self.radprof[0][:,1], ( (self.radprof[0][:,0], 'radial_distance', self.dims[0][2]), ), parent=hdl, overwrite=True)
-            if not self.res[0] is None:
-                femd.put_emdgroup('fit_results', self.res[0], ( ( np.array(range(self.res[0].shape[0])), 'parameters', '[]'), ), parent=hdl, overwrite=True)
-            if not self.center[0] is None:
-                femd.put_emdgroup('centers', self.center[0], ( ( np.array(range(2)), 'dimension', self.dims[0][2]), ), parent=hdl, overwrite=True) 
-            if not self.dists[0] is None:
-                femd.put_emdgroup('distortions', self.dists[0], ( ( np.array(range(self.dists[0].shape[0])), 'parameters', '[]'), ), parent=hdl, overwrite=True)
-            if not self.back_params[0] is None:
-                femd.put_emdgroup('back_results', self.back_params[0], ( ( np.array(range(self.back_params[0].shape[0])), 'background parameters', '[]'), ), parent=hdl, overwrite=True)
+            if len(self.dims) == 3:
+                n = None
+                for i in range(len(self.radprof)):
+                    if not self.radprof[i] is None:
+                        n = i
+                        radprof = np.zeros( (self.radprof[i].shape[0], len(self.radprof)) )
+                        for ii in range(len(self.radprof)):
+                            if not self.radprof[ii] is None:
+                                radprof[:,ii] = self.radprof[ii][:,1]
+                        femd.put_emdgroup('radial_profile', radprof, ( (self.radprof[n][:,0], 'radial distance', self.dims[0][2]), self.dims[2] ), parent=hdl, overwrite=True)
+                        break
+                
+                for i in range(len(self.res)):
+                    if not self.res[i] is None:
+                        res = np.zeros( (self.res[i].shape[0], len(self.res)) )
+                        for ii in range(len(self.res)):
+                            if not self.res[ii] is None:
+                                res[:,ii] = self.res[ii][:]
+                        femd.put_emdgroup('fit_results', res, ( ( np.array(range(res.shape[0])), 'parameters', '[]'), self.dims[2] ), parent=hdl, overwrite=True)
+                        break
+                
+                for i in range(len(self.center)):
+                    if not self.center[i] is None:
+                        centers = np.zeros( (2, len(self.center)) )
+                        for ii in range(len(self.center)):
+                            if not self.center[ii] is None:
+                                centers[:,ii] = self.center[ii][:]
+                        femd.put_emdgroup('centers', centers, ( ( np.array(range(2)), 'dimension', self.dims[0][2]), self.dims[2] ), parent=hdl, overwrite=True) 
+                        break
+                
+                for i in range(len(self.dists)):
+                    if not self.dists[i] is None:
+                        dists = np.zeros( (self.dists[i].shape[0], len(self.dists)) )
+                        for ii in range(len(self.dists)):
+                            if not self.dists[ii] is None:
+                                dists[:,ii] = self.dists[ii][:]
+                        femd.put_emdgroup('distortions', dists, ( ( np.array(range(dists.shape[0])), 'parameters', '[]'), self.dims[2] ), parent=hdl, overwrite=True)
+                        break
+                
+                for i in range(len(self.back_params)):
+                    if not self.back_params[i] is None:
+                        back_params = np.zeros( (self.back_params[i].shape[0], len(self.back_params)) )
+                        for ii in range(len(self.back_params)):
+                            if not self.back_params[ii] is None:
+                                back_params[:,ii] = self.back_params[ii][:]
+                        femd.put_emdgroup('back_results', back_params, ( ( np.array(range(back_params.shape[0])), 'background parameters', '[]'), self.dims[2] ), parent=hdl, overwrite=True)
+                        break
+                
+            else:
+                if not self.radprof[self.idx] is None:
+                    femd.put_emdgroup('radial_profile', self.radprof[0][:,1], ( (self.radprof[0][:,0], 'radial_distance', self.dims[0][2]), ), parent=hdl, overwrite=True)
+                if not self.res[self.idx] is None:
+                    femd.put_emdgroup('fit_results', self.res[0], ( ( np.array(range(self.res[0].shape[0])), 'parameters', '[]'), ), parent=hdl, overwrite=True)
+                if not self.center[self.idx] is None:
+                    femd.put_emdgroup('centers', self.center[0], ( ( np.array(range(2)), 'dimension', self.dims[0][2]), ), parent=hdl, overwrite=True) 
+                if not self.dists[self.idx] is None:
+                    femd.put_emdgroup('distortions', self.dists[0], ( ( np.array(range(self.dists[0].shape[0])), 'parameters', '[]'), ), parent=hdl, overwrite=True)
+                if not self.back_params[self.idx] is None:
+                    femd.put_emdgroup('back_results', self.back_params[0], ( ( np.array(range(self.back_params[0].shape[0])), 'background parameters', '[]'), ), parent=hdl, overwrite=True)
 
-        # save settings 
-        # make them valid
-        # create a copy of settings to decouple
-        mysettings = copy.deepcopy(self.settings)
-        for key in emt.eva.ring_diff.min_dummie_settings:
-            if not key in mysettings:
-                mysettings[key] = emt.eva.ring_diff.min_dummie_settings[key]
-        
-        emt.eva.ring_diff.put_settings( hdl, mysettings )
-        
-        # save a comment
-        femd.put_comment( 'Ring diffraction evaluation saved from gui_ringdiff.' )
+            # save settings 
+            # make them valid
+            # create a copy of settings to decouple
+            mysettings = copy.deepcopy(self.settings)
+            for key in emt.eva.ring_diff.min_dummie_settings:
+                if not key in mysettings:
+                    mysettings[key] = emt.eva.ring_diff.min_dummie_settings[key]
+            
+            emt.eva.ring_diff.put_settings( hdl, mysettings )
+            
+            # save a comment
+            femd.put_comment( 'Ring diffraction evaluation saved from gui_ringdiff.' )
 
-        # close file
-        del femd
+            # close file
+            del femd
+            
+        except:
+            self.log('Saving evaluation to file "{}" failed.'.format(fname))
+            raise RuntimeError()
+            
     
     def on_intensitySlider(self):
         '''
@@ -742,6 +788,8 @@ class Main(QtGui.QMainWindow):
         Calculate local maxima.
         '''
     
+        self.log('Calculating local maxima ..')
+    
         # parse the input
         try:
             max_r = float(self.gui_localmax['txt_lmax_r'].text())
@@ -759,6 +807,7 @@ class Main(QtGui.QMainWindow):
                 assert(len(cinit)==2 and len(rrange)==2)
                 
         except:
+            self.log('.. could not parse the given input.')
             raise TypeError('Bad input to local maxima')
 
         # update settings
@@ -771,9 +820,12 @@ class Main(QtGui.QMainWindow):
         points = emt.algo.local_max.local_max(self.data[:,:,self.idx], self.settings['lmax_r'], self.settings['lmax_thresh'])
         points = emt.algo.local_max.points_todim(points, self.dims)
                 
+        self.log('.. found {:d} candidate points.'.format(points.shape[0]))
+                
         # filter to single ring if input provided
         if (len(self.settings['lmax_cinit'])==2 and len(self.settings['lmax_range'])==2):
             points = emt.algo.distortion.filter_ring(points, self.settings['lmax_cinit'], self.settings['lmax_range'])
+            self.log('.. filtered to {:d} points.'.format(points.shape[0]))
         
         # save points in main
         self.points[self.idx] = points
@@ -842,13 +894,15 @@ class Main(QtGui.QMainWindow):
                 cinit = [float(item.strip()) for item in cinit.split(',')]
                 assert(len(cinit)==2)
         except:
+            self.log('Failed to parse initial center guess from input.')
             raise TypeError('Bad input to local maxima')
             
         if len(cinit) == 0:
-            print('No initial guess given.')
+            self.log('Failed to copy initial center guess from input.')
         else:
             self.settings['lmax_cinit'] = cinit
             self.center[self.idx]=np.array(cinit)
+            self.log('Copied initial center guess: ({:g}, {:g}).'.format(self.center[self.idx][0], self.center[self.idx][1]))
 
         self.update_polar()
         
@@ -856,8 +910,10 @@ class Main(QtGui.QMainWindow):
 
     def on_optimizeCenter(self):
     
+        self.log('Optimizing center ..')
         center = emt.algo.distortion.optimize_center(self.points[self.idx], self.center[self.idx])
         self.center[self.idx]= center
+        self.log('.. optimized to ({:g}, {:g}).'.format(self.center[self.idx][0], self.center[self.idx][1]))
         
         self.update_polar()
         
@@ -872,10 +928,13 @@ class Main(QtGui.QMainWindow):
             else:
                 ns = [int(item.strip()) for item in ns.split(',')]
         except:
+            self.log('Failed to parse input to fit distortions.')
             raise TypeError('Bad input in ')
             
         # update setting
         self.settings['ns'] = ns 
+       
+        self.log('Fitting distortions of order(s) {}'.format(self.settings['ns']))
        
         # run optimization
         if len(ns) >= 1:
@@ -883,6 +942,12 @@ class Main(QtGui.QMainWindow):
             dists = emt.algo.distortion.optimize_distortion(points_plr, self.settings['ns'])
             
             self.dists[self.idx] = dists
+            
+            self.log('.. fitted to:')
+            self.log('.. .. radius: {:g}'.format(self.dists[self.idx][0]))
+            
+            for i in range(len(self.settings['ns'])):
+                self.log('.. .. order: {:d}, alpha: {:g}, beta: {:g}'.format(self.settings['ns'][i], self.dists[self.idx][1+i*2], self.dists[self.idx][2+i*2]))
             
         self.update_polar()
         
@@ -952,6 +1017,8 @@ class Main(QtGui.QMainWindow):
         Extract the radial profile from the diffraction pattern.
         '''
         
+        self.log('Extracting radial profile ..')
+        
         try:
             pars = self.gui_radprof['rad_txt'].text().strip()
             if pars == '':
@@ -968,6 +1035,7 @@ class Main(QtGui.QMainWindow):
                 assert(len(fitrange)==2)
                    
         except:
+            self.log('Failed to parse given input to extract radial profile.')
             raise TypeError('Bad input in ')
         
         # save settings
@@ -975,24 +1043,29 @@ class Main(QtGui.QMainWindow):
             self.settings['rad_rmax'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])*np.min(self.data[:,:,self.idx].shape)/2.0
             self.settings['rad_dr'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])/10.
             self.settings['rad_sigma'] = np.abs(self.dims[0][0][0]-self.dims[0][0][1])
+            self.log('.. calculating adaptive defaults: r_max: {:g}, dr: {:g}, sigma: {:g}'.format(self.settings['rad_rmax'], self.settings['rad_dr'], self.settings['rad_sigma']))
         else:
             self.settings['rad_rmax'] = pars[0]
             self.settings['rad_dr'] = pars[1]
             self.settings['rad_sigma'] = pars[2]
+            self.log('.. using given r_max, dr and sigma.')
         
         self.settings['fit_rrange'] = fitrange
         
         # get the polar coordinate system
         if self.gui_radprof['crct_check'].isChecked():
             rs, thes = emt.algo.radial_profile.calc_polarcoords( self.center[self.idx], self.dims, self.settings['ns'], self.dists[self.idx] )
+            self.log('.. calculating coordinate system, correcting for distortions.')
         else:
             rs, thes = emt.algo.radial_profile.calc_polarcoords( self.center[self.idx], self.dims )
+            self.log('.. calculating coordinate system, not correcting distortions.')
         
         # get the radial profile
         R, I = emt.algo.radial_profile.calc_radialprofile( self.data[:,:,self.idx], rs, self.settings['rad_rmax'], self.settings['rad_dr'], self.settings['rad_sigma'] )
         
         # save in main
         self.radprof[self.idx] = np.array([R,I]).transpose()
+        self.log('.. extracted radial profile.')
     
         # update the plot
         self.update_RadProf()
@@ -1008,6 +1081,8 @@ class Main(QtGui.QMainWindow):
         '''
         Fit power law background and subtract.
         '''
+        
+        self.log('Fitting background to radial profile.')
         
         # parse the input
         try:
@@ -1028,6 +1103,7 @@ class Main(QtGui.QMainWindow):
                 back_init = [float(item.strip()) for item in back_init.split(',')]
                 assert(len(back_init) == 3)
         except:
+            self.log('Failed to parse input given to fit background.')
             raise TypeError('Bad input to subtract background.')
             
         # save settings
@@ -1043,12 +1119,16 @@ class Main(QtGui.QMainWindow):
             fit_R = np.append(fit_R, self.radprof[self.idx][ix,0])
             fit_I = np.append(fit_I, self.radprof[self.idx][ix,1])
         
+        self.log('.. found {:d} points to support background.'.format(fit_I.shape[0]))
+        
         # fit power law
         funcs_back = [ 'const', 'powlaw' ]
         res_back = emt.algo.radial_profile.fit_radialprofile( fit_R, fit_I, funcs_back, self.settings['back_init'], maxfev=1000 )
         
         # save output
         self.back_params[self.idx] = res_back
+        
+        self.log('.. background fitted to: offset: {:g}, amplitude: {:g}, exponent: {:g}'.format(self.back_params[self.idx][0], self.back_params[self.idx][1], self.back_params[self.idx][2]))
         
         self.update_RadProf()
        
@@ -1063,6 +1143,8 @@ class Main(QtGui.QMainWindow):
         '''
         Fit the radial profile with peak functions.
         '''
+        
+        self.log('Fitting radial profile ..')
         
         # parse the input
         try:
@@ -1088,6 +1170,7 @@ class Main(QtGui.QMainWindow):
                     init_guess.append(param)        
         
         except:
+            self.log('Failed to parse input given to fit radial profile.')
             raise TypeError('Bad input to fit radial profile.')
         
         
@@ -1108,6 +1191,7 @@ class Main(QtGui.QMainWindow):
                 sel = (R>=self.settings['fit_rrange'][0])*(R<=self.settings['fit_rrange'][1])
                 I = I[sel]
                 R = R[sel]
+                self.log('.. fitting in the range of {:g} to {:g}.'.format(self.settings['fit_rrange'][0], self.settings['fit_rrange'][1]))
         
             back = None
         
@@ -1124,11 +1208,18 @@ class Main(QtGui.QMainWindow):
                 back = emt.algo.math.sum_functions( R, ('const', 'powlaw'), self.back_params[self.idx] )
          
                 I -= back
+                
+                self.log('.. subtracting background.')
  
  
             res = emt.algo.radial_profile.fit_radialprofile( R, I, self.settings['fit_funcs'], self.settings['fit_init'], 10000 )
             
-            self.res[self.idx] = res          
+            self.res[self.idx] = res
+            self.log('.. peaks fitted to:')
+            n = 0
+            for i in range(len(self.settings['fit_funcs'])):
+                self.log('.. .. {}: {}'.format(self.settings['fit_funcs'][i],  ', '.join(map('{:g}'.format, self.res[self.idx][n:n+emt.algo.math.lkp_funcs[self.settings['fit_funcs'][i]][1]]))))
+                n += emt.algo.math.lkp_funcs[self.settings['fit_funcs'][i]][1]
                         
         self.update_RadProf()
         
@@ -1175,6 +1266,8 @@ class Main(QtGui.QMainWindow):
             for i in range(self.data.shape[2]):
             
                 self.idx = i
+            
+                self.log('Running evaluation of {:d}/{:d}.'.format(self.idx, self.data.shape[2]))
                 
                 self.on_runsgl()
     
