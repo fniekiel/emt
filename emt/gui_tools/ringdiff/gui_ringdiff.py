@@ -61,7 +61,7 @@ class Main(QtGui.QMainWindow):
         self.back_params = None
         self.res = None
         self.mask = None
-        
+        self.idx = None
     
     
     def initUI(self):
@@ -77,7 +77,7 @@ class Main(QtGui.QMainWindow):
         self.log_txt.setReadOnly(True)
         hbox_log = QtGui.QHBoxLayout(self.log_wdg)
         hbox_log.addWidget(self.log_txt)
-        self.log_wdg.setGeometry(300,300,500,200)
+        self.log_wdg.setGeometry(300,300,768,200)
         self.log_wdg.setWindowTitle('Log')
         self.log_wdg.show()
         
@@ -295,11 +295,17 @@ class Main(QtGui.QMainWindow):
         
         self.gui_radprof['fit_btn'] = QtGui.QPushButton('Fit Radial Profile', frame_radprof)
         self.gui_radprof['fit_btn'].clicked.connect(self.on_fitRadProf)
-        self.gui_radprof['fit_check'] = QtGui.QCheckBox('Plot Fit', frame_radprof)
-        self.gui_radprof['fit_check'].stateChanged.connect(self.update_RadProf)
+        self.gui_radprof['fit_check'] = QtGui.QRadioButton('Plot Fit', frame_radprof)
+        self.gui_radprof['fit_check'].toggled.connect(self.update_RadProf)
+        self.gui_radprof['init_check'] = QtGui.QRadioButton('Plot Init', frame_radprof)
+        self.gui_radprof['init_check'].toggled.connect(self.update_RadProf)
+        self.gui_radprof['init_check'].toggle()
         hbox_radprof_fitbtns2 = QtGui.QHBoxLayout()
         hbox_radprof_fitbtns2.addWidget(self.gui_radprof['fit_btn'])
-        hbox_radprof_fitbtns2.addWidget(self.gui_radprof['fit_check'])
+        vbox_radprof_tglbtns = QtGui.QVBoxLayout()
+        vbox_radprof_tglbtns.addWidget(self.gui_radprof['fit_check'])
+        vbox_radprof_tglbtns.addWidget(self.gui_radprof['init_check'])
+        hbox_radprof_fitbtns2.addLayout(vbox_radprof_tglbtns)
         layout_radprof.addLayout(hbox_radprof_fitbtns2)
         
        
@@ -316,10 +322,13 @@ class Main(QtGui.QMainWindow):
         hbox_run.addWidget(self.gui_run['all_btn'])
         layout_run.addLayout(hbox_run)
         
-        self.gui_run['out_btn'] = QtGui.QPushButton('Save to EMD', frame_run)
+        self.gui_run['out_btn'] = QtGui.QPushButton('Save evaluation to EMD', frame_run)
         self.gui_run['out_btn'].clicked.connect(self.on_saveEMDFile)
         layout_run.addWidget(self.gui_run['out_btn'])
         
+        self.gui_run['savedist_btn'] = QtGui.QPushButton('Save corrected diffraction pattern', frame_run)
+        self.gui_run['savedist_btn'].clicked.connect(self.on_saveCorrPattern)
+        layout_run.addWidget(self.gui_run['savedist_btn'])
         
         
         vbox_left = QtGui.QVBoxLayout()
@@ -397,7 +406,7 @@ class Main(QtGui.QMainWindow):
         
         self.mnwid.setLayout(hbox)
         
-        self.setGeometry(300,300,1500,1100)
+        self.setGeometry(100,100,1500,1100)
         self.setWindowTitle('Evaluation of Ring Diffraction Patterns')
         
         self.show()
@@ -964,7 +973,7 @@ class Main(QtGui.QMainWindow):
             I = np.copy(self.radprof[self.idx][:,1])
             
             # cut to fitrange
-            if (not len(self.settings['fit_rrange']) == 0) and (self.gui_radprof['fit_check'].isChecked()):
+            if (not len(self.settings['fit_rrange']) == 0) and (self.gui_radprof['fit_check'].isChecked() or self.gui_radprof['init_check'].isChecked()):
                 sel = (R>=self.settings['fit_rrange'][0])*(R<=self.settings['fit_rrange'][1])
                 I = I[sel]
                 R = R[sel]
@@ -1004,6 +1013,18 @@ class Main(QtGui.QMainWindow):
                 for n in range(len(self.settings['fit_funcs'])):
                     self.plt_radprof.plot(R, emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][0](R, self.res[self.idx][i:i+emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][1]]), pen=(0,180,0)) 
                     i += emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][1]
+                    
+            elif ('fit_init' in self.settings) and (self.gui_radprof['init_check'].isChecked()):
+            
+                # draw fit results
+                initsum = emt.algo.math.sum_functions( R, self.settings['fit_funcs'], self.settings['fit_init'] )
+                self.plt_radprof.plot(R, initsum, pen=(0,0,255))
+                
+                i = 0
+                for n in range(len(self.settings['fit_funcs'])):
+                    self.plt_radprof.plot(R, emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][0](R, self.settings['fit_init'][i:i+emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][1]]), pen=(0,180,0)) 
+                    i += emt.algo.math.lkp_funcs[self.settings['fit_funcs'][n]][1]
+                    
     
             # plot radial profile
             self.plt_radprof.plot(R, I, pen=(255,0,0))
@@ -1270,6 +1291,10 @@ class Main(QtGui.QMainWindow):
                 self.log('Running evaluation of {:d}/{:d}.'.format(self.idx, self.data.shape[2]))
                 
                 self.on_runsgl()
+    
+    
+    def on_saveCorrPattern(self):
+        pass
     
     
 if __name__ == '__main__':
