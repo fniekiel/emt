@@ -54,6 +54,7 @@ class Main(QtGui.QMainWindow):
         self.radprof = None
         self.back_params = None
         self.res = None
+        self.mask = None
         
     
     def initUI(self):
@@ -516,9 +517,7 @@ class Main(QtGui.QMainWindow):
         self.gui_radprof['fitxs_txt'].setText( ', '.join(map('{:g}'.format, self.settings['back_xs'])) )
         self.gui_radprof['fitxsw_txt'].setText( '{:g}'.format(self.settings['back_xswidth']) )
         self.gui_radprof['back_init_txt'].setText( ', '.join(map('{:g}'.format, self.settings['back_init'])) )
-        
-        
-        
+           
         n = 0
         for i in range(len(self.settings['fit_funcs'])):
             self.gui_radprof['fit_tbl'].insertRow(self.gui_radprof['fit_tbl'].rowCount())
@@ -536,6 +535,12 @@ class Main(QtGui.QMainWindow):
         self.radprof = [None]*data.shape[2]
         self.back_params = [None]*data.shape[2]
         self.res = [None]*data.shape[2]
+        
+        if self.settings['mask'] is None:
+            self.mask = None
+        else:
+            self.mask = self.settings['mask']
+            
             
         # configure intensity sliders
         min_data = np.min(self.data)
