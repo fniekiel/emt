@@ -345,7 +345,7 @@ def plot_distpolar(points, dims, dists, ns, show=False):
     # labels
     ax.set_xlabel('theta /[rad]')
     ax.set_xlim( (-np.pi, np.pi) )
-    ax.set_ylabel('r /{}'.format(dims[0][2].decode('utf-8')))
+    ax.set_ylabel('r /{}'.format(dims[0][2]))
     
     if show:
         plt.show(block=False)

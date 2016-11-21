@@ -208,7 +208,7 @@ def plot_radialprofile( r, intens, dims, show=False ):
     ax.plot(r, intens, 'r-')
     
     # labels
-    ax.set_xlabel('r /{}'.format(dims[0][2].decode('utf-8')))
+    ax.set_xlabel('r /{}'.format(dims[0][2]))
     ax.set_ylabel('I /[a.u.]')
         
     if show:
@@ -334,7 +334,7 @@ def plot_fit( r, intens, dims, funcs, param, show=False ):
     ax.plot(r, sum_funcs, 'b-')
     
     # labels
-    ax.set_xlabel('r /{}'.format(dims[0][2].decode('utf-8')))
+    ax.set_xlabel('r /{}'.format(dims[0][2]))
     ax.set_ylabel('I /[a.u.]')
         
     if show:
