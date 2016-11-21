@@ -85,8 +85,8 @@ def plot_points(img, points, vminmax=(0,1), dims=None, invert=False, show=False)
     
     if dims:
         ax.imshow(img.transpose(), cmap=cmap, vmin=np.min(img)+vminmax[0]*(np.max(img)-np.min(img)), vmax=np.min(img)+vminmax[1]*(np.max(img)-np.min(img)), extent=(np.min(dims[0][0]), np.max(dims[0][0]), np.max(dims[1][0]), np.min(dims[1][0])) )
-        ax.set_xlabel('{} {}'.format(dims[0][1].decode('utf-8'), dims[0][2].decode('utf-8')))
-        ax.set_ylabel('{} {}'.format(dims[1][1].decode('utf-8'), dims[1][2].decode('utf-8')))
+        ax.set_xlabel('{} {}'.format(dims[0][1], dims[0][2]))
+        ax.set_ylabel('{} {}'.format(dims[1][1], dims[1][2]))
         ax.set_xlim((np.min(dims[0][0]), np.max(dims[0][0])))
         ax.set_ylim((np.max(dims[1][0]), np.min(dims[1][0])))
     else:

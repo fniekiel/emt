@@ -199,7 +199,12 @@ class test_ringdiff(unittest.TestCase):
             noplot = emt.algo.distortion.plot_distpolar(points_plr, dims, dists[0:3], (2,3,4))
         with self.assertRaises(TypeError):
             noplot = emt.algo.distortion.plot_distpolar(points_plr, dims, dists, 42)
-        
+
+
+        ## corrected images
+        img_corr = emt.algo.radial_profile.correct_distortion( img, dims, center, (2,3,4), dists )
+
+        import pdb;pdb.set_trace()
         
         # try a bunch of fits
         for ns in ( (2,), (2,3), (2,3,4), (2,3,4,5), (4,) ):
@@ -207,13 +212,13 @@ class test_ringdiff(unittest.TestCase):
             dists = emt.algo.distortion.optimize_distortion(points_plr, ns, verbose=True)
             plot = emt.algo.distortion.plot_distpolar(points_plr, dims, dists, ns, show=show)
             
-        
+
         # wait for plots
         if show:
             plt.show()
     
     
-    def test_radialprofile(self):
+    #def test_radialprofile(self):
         '''
         Test the radial_profile algorithms to be used on ring diffraction patterns.
         '''
@@ -394,7 +399,7 @@ class test_ringdiff(unittest.TestCase):
             plt.show()            
     
     
-    def test_eva(self):
+    #def test_eva(self):
         
         plt.close('all')        
         show=True

@@ -5,6 +5,7 @@ Module to calculate radial profiles.
 import copy
 import numpy as np
 import scipy.ndimage.filters
+import scipy.interpolate
 import matplotlib.pyplot as plt
 
 import emt.algo.math
@@ -61,6 +62,53 @@ def calc_polarcoords ( center, dims, ns=None, dists=None ):
     
     return rs, thes
     
+      
+def correct_distortion( img, dims, center, ns, dists ):
+    '''
+    Give corrected version of img with respect to distortions.
+    
+    input:
+    - img       2D np.ndarray holding image
+    - dims      dimensions
+    - center    center to be used
+    - ns        list of distortion orders
+    - dists     distortion parameters
+    '''
+    
+    # check input
+    try:
+        assert(isinstance(img, np.ndarray))
+    
+        # check center 
+        center = np.array(center)
+        center = np.reshape(center, 2)
+        
+        # check if enough dims availabel
+        assert(len(dims)>=2)
+        assert(len(dims[0])==3)
+        
+        # check orders
+        assert(len(ns)>=1)
+        
+        # check dists
+        assert(dists.shape[0] == len(ns)*2+1)
+            
+    except:
+        raise TypeError('Something wrong with the input!')
+    
+    rs, thes = calc_polarcoords (center, dims )
+    
+    # anti distort
+    for i in range(len(ns)):
+        rs *= emt.algo.distortion.rad_dis(thes, dists[i*2+1], dists[i*2+2], ns[i]) 
+    
+    dis_xx = rs*np.cos(thes)+center[0]
+    dis_yy = rs*np.sin(thes)+center[1]
+    
+    f = scipy.interpolate.RectBivariateSpline(dims[0][0], dims[1][0], img)
+
+    return f.ev(dis_xx, dis_yy)
+        
     
 def calc_radialprofile( img, rs, rMax, dr, rsigma, mask=None):
     '''

@@ -1443,14 +1443,49 @@ class Main(QtGui.QMainWindow):
             
                 self.idx = i
             
-                self.log('Running evaluation of {:d}/{:d}.'.format(self.idx, self.data.shape[2]))
+                self.log('Running evaluation of {:d}/{:d}.'.format(self.idx+1, self.data.shape[2]))
                 
                 self.on_runsgl()
     
     
     def on_saveCorrPattern(self):
-        pass
     
+        fname, _ = QtGui.QFileDialog.getSaveFileName(self, 'Save to EMD file', filter='EMD files (*.emd);;All files (*.*)')
+        
+        try:
+            self.log('Saving corrected diffraction pattern to file "{}".'.format(fname))
+            
+            # create/overwrite outfile
+            if os.path.isfile(fname):
+                os.remove(fname)
+            femd = emt.io.emd.fileEMD(fname)            
+                
+            grp = femd.file_hdl['data']
+            
+            data_corr = np.zeros(self.data.shape)
+            
+            for i in range(self.data.shape[2]):
+                
+                self.idx = i
+                
+                if (not self.center[self.idx] is None) and (not self.dists[self.idx] is None):
+                 
+                    self.log('.. correcting image {:d}/{:d}.'.format(self.idx+1, self.data.shape[2]))
+                        
+                    data_corr[:,:,self.idx] = emt.algo.radial_profile.correct_distortion( self.data[:,:,self.idx], self.dims, self.center[self.idx], self.settings['ns'], self.dists[self.idx])
+                else:
+                    self.log('.. skipping image {:d}/{:d} for missing results.'.format(self.idx+1, self.data.shape[2]))
+            
+            if len(self.dims) == 3:
+                femd.put_emdgroup(self.femd_in.file_hdl.filename.split('/')[-1], data_corr, self.dims, parent=grp)
+            else:
+                femd.put_emdgroup(self.femd_in.file_hdl.filename.split('/')[-1], data_corr[:,:,self.idx], self.dims, parent=grp)
+            
+            del femd
+        
+        except:
+            self.log('Saving corrected diffraction pattern failed.')
+            raise
     
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
