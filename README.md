@@ -1,4 +1,6 @@
 # emt
 Electron Microscopy Tools
 
-**not ready to be used yet!** (give me some more time)
+**DEPRECATED**
+
+Has been moved to https://github.com/ercius/openNCEM.
